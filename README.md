@@ -1,6 +1,6 @@
 # VerseLoop — ESV-only memorization with real spaced repetition
 
-A native iOS app (SwiftUI, zero dependencies) for one workflow: **starting the day by memorizing ESV verses word-by-word from first letters** — without being punished for fat-finger taps, and without your verses being trapped on one device.
+A native iOS app (SwiftUI, zero dependencies) for one workflow: **starting the day by memorizing ESV verses word-by-word from first letters, with the reference tested last** — without being punished for fat-finger slips, and without your verses being trapped on one device.
 
 Built as an alternative to Versify for that single workflow. It is deliberately **not** a Versify clone: no game arcade, no multi-translation library, no account system. One daily Loop, one tester, one scheduler.
 
@@ -14,7 +14,7 @@ Built as an alternative to Versify for that single workflow. It is deliberately 
 | Progress bar, no mistake accounting | No progress bar — a **mistake count** in the header, net of forgiven slips, plus a suggested grade |
 | Library stuck on-device | **JSON export/import + optional Worker sync code** — same code on two devices, push/pull |
 
-Tester: **type the first letter** of each word, one at a time. Right letter → the word appears; wrong letter → haptic buzz, the word appears red as a mistake, and you move on. Every mistake carries its own "accidental?" toggle (shake forgives the latest too). Finish the verse, see mistakes + a suggested grade, then grade. Grades get an **8-second Undo** too. Full dark-mode support throughout.
+Tester: the reference stays **hidden** and no word counts are shown. **Type the first letter** of each word, one at a time. Right letter → the word appears; wrong letter → haptic buzz, the word appears red as a mistake, and you move on. Every mistake carries its own "accidental?" toggle (shake forgives the latest too). Last of all, type the **reference: book initial, then numbers** (colon skipped). Then see mistakes + a suggested grade, and grade. Grades get an **8-second Undo** too. Full dark-mode support throughout.
 
 ## ESV-only, legally
 

@@ -54,9 +54,13 @@ final class VerseLoopUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["· 0 mistakes"].waitForExistence(timeout: 5))
         snap(app, "03-review-forgiven")
 
-        // Type the rest correctly (LORD is my shepherd; I shall not want)
+        // Type the rest correctly (LORD is my shepherd; I shall not want),
+        // then the reference last (P + 231, colon skipped)
         field.tap()
         field.typeText("limsisnw")
+        XCTAssertTrue(app.staticTexts["ref-prompt"].waitForExistence(timeout: 10))
+        field.tap()
+        field.typeText("P231")
         XCTAssertTrue(app.staticTexts["Suggested: Easy — but your grade decides, as always."].waitForExistence(timeout: 10))
 
         // Grade, undo the grade, re-grade, advance

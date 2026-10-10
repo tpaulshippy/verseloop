@@ -37,30 +37,55 @@ struct FlowLayout: Layout {
 }
 
 /// Type-the-first-letter tester (matches the Versify "Type" flow):
-/// - words reveal one at a time as you type each first letter
-/// - right letter -> word appears, move on
-/// - wrong letter -> vibrate, word appears red as a mistake, move on
+/// - the REFERENCE IS HIDDEN until the end; words never show counts
+/// - type each word's first letter: right -> word appears, wrong -> buzz,
+///   red mistake, move on
 /// - every mistake carries its own "accidental?" forgiveness toggle
-/// - mistake count shown instead of a progress bar
+/// - last: the reference — book initial, then numbers (no colon)
+/// - mistake count shown instead of a progress bar or word counts
 /// - grade is ALWAYS explicit (Again/Hard/Good/Easy) -> true SM-2
 /// - every grade has an 8s Undo
 struct ReviewView: View {
     @EnvironmentObject var store: VerseStore
     var verse: Verse
 
+    // Word pass
     @State private var idx = 0
     @State private var revealed: Set<Int> = []
     @State private var mistakes: Set<Int> = []
     @State private var forgiven: Set<Int> = []
+    // Reference pass (last)
+    @State private var refShown: [Bool] = []
+    @State private var refWrong: Set<Int> = []
+    @State private var refForgiven: Set<Int> = []
+
     @State private var entry = ""
     @FocusState private var entryFocused: Bool
     @State private var graded: Grade?
     @Environment(\.dismiss) var dismiss
 
     private var words: [String] { verse.words }
-    private var done: Bool { idx >= words.count }
-    private var mistakeCount: Int { mistakes.subtracting(forgiven).count }
+    private var wordsDone: Bool { idx >= words.count }
+
+    /// Reference challenge: book initial, then every digit (colon skipped).
+    /// Parenthetical suffixes (e.g. demo labels) are stripped first.
+    private var refExpected: [String] {
+        let core = verse.reference.split(separator: "(").first.map(String.init) ?? verse.reference
+        var out: [String] = []
+        if let firstLetter = core.first(where: { $0.isLetter }) {
+            out.append(String(firstLetter))
+        }
+        out.append(contentsOf: core.filter(\.isNumber).map(String.init))
+        return out
+    }
+
+    private var refDone: Bool { !refExpected.isEmpty && refShown.count == refExpected.count && refShown.allSatisfy({ $0 }) }
+    private var done: Bool { wordsDone && (refExpected.isEmpty || refDone) }
+    private var wordMistakes: Int { mistakes.subtracting(forgiven).count }
+    private var refMistakes: Int { refWrong.subtracting(refForgiven).count }
+    private var mistakeCount: Int { wordMistakes + refMistakes }
     private var mistakeText: String { mistakeCount == 1 ? "1 mistake" : "\(mistakeCount) mistakes" }
+    private var forgivenTotal: Int { forgiven.count + refForgiven.count }
     private var suggested: String {
         if mistakeCount == 0 { return "Easy" }
         if mistakeCount <= 2 { return "Good" }
@@ -72,9 +97,12 @@ struct ReviewView: View {
             VStack(alignment: .leading, spacing: 16) {
                 header
                 passage
-                if !done {
-                    inputRow
+                if !wordsDone {
+                    inputRow(prompt: "Type the first letter", detail: "of the next word")
                     controls
+                } else if !done {
+                    referencePass
+                    inputRow(prompt: "Type the next character", detail: "initial, then numbers")
                 }
                 if graded == nil {
                     if done { gradeBlock }
@@ -84,29 +112,30 @@ struct ReviewView: View {
             }
             .padding()
         }
-        .navigationTitle(verse.reference)
+        .navigationTitle("Type")
         .navigationBarTitleDisplayMode(.inline)
         .background(ShakeDetector().frame(width: 0, height: 0))
         .onReceive(NotificationCenter.default.publisher(for: .deviceDidShake)) { _ in
             forgiveLatestMistake()
         }
-        .onAppear { entryFocused = true }
+        .onAppear {
+            if refShown.isEmpty { refShown = Array(repeating: false, count: refExpected.count) }
+            entryFocused = true
+        }
     }
 
-    // MARK: header — mistake count, no progress bar
+    // MARK: header — mistake count only (no reference, no word counts, no progress bar)
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 DueBadge(review: store.review(for: verse.id))
-                Text(done ? "\(words.count) of \(words.count)" : "word \(min(idx + 1, words.count)) of \(words.count)")
-                    .font(.caption).foregroundStyle(.secondary)
                 Text("· \(mistakeText)")
                     .font(.caption).bold(mistakeCount > 0)
                     .foregroundStyle(mistakeCount > 0 ? Color.red : Color.secondary)
                 Spacer()
             }
-            Text("Type the first letter of each word. Wrong letter buzzes and marks a mistake — tap any red word to forgive a slip.")
+            Text("Type the first letter of each word. The reference stays hidden — it's tested last. Wrong letters buzz and mark red mistakes; tap any red word to forgive a slip.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -142,9 +171,58 @@ struct ReviewView: View {
         .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
     }
 
+    // MARK: reference pass (last thing tested)
+
+    private var referencePass: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Reference last — book initial, then numbers.")
+                .font(.headline)
+                .accessibilityIdentifier("ref-prompt")
+            HStack(spacing: 10) {
+                ForEach(Array(refExpected.enumerated()), id: \.offset) { i, ch in
+                    let shown = i < refShown.count && refShown[i]
+                    let isMistake = refWrong.contains(i) && !refForgiven.contains(i)
+                    let isForgiven = refWrong.contains(i) && refForgiven.contains(i)
+                    Button {
+                        if refWrong.contains(i) { toggleRefForgiven(i) }
+                    } label: {
+                        VStack(spacing: 0) {
+                            Text(shown ? ch : "＿")
+                                .font(.system(.title2, design: .rounded).bold())
+                                .monospaced()
+                                .frame(minWidth: 34, minHeight: 44)
+                                .background(
+                                    shown
+                                        ? (isMistake ? Color.red.opacity(0.15) : Color.accentColor.opacity(0.15))
+                                        : Color.secondary.opacity(0.10),
+                                    in: RoundedRectangle(cornerRadius: 10)
+                                )
+                            if isMistake {
+                                Text("slip?").font(.caption2).foregroundStyle(.secondary)
+                            } else if isForgiven {
+                                Text("✓").font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!refWrong.contains(i))
+                    .accessibilityLabel(isMistake ? "Forgive ref \(i)" : (isForgiven ? "Ref forgiven \(i), tap to unmark" : "Reference character \(i)"))
+                }
+            }
+            Button("Show reference") {
+                // Unrecalled remainder counts as misses — forgivable below.
+                for i in refExpected.indices where !(i < refShown.count && refShown[i]) {
+                    refWrong.insert(i)
+                    refShown[i] = true
+                }
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+
     // MARK: input
 
-    private var inputRow: some View {
+    private func inputRow(prompt: String, detail: String) -> some View {
         HStack(spacing: 12) {
             TextField("first letter…", text: $entry)
                 .accessibilityIdentifier("first-letter-input")
@@ -160,8 +238,8 @@ struct ReviewView: View {
                 .onChange(of: entry) { _, new in processInput(new) }
                 .onSubmit { entry = "" }
             VStack(alignment: .leading, spacing: 2) {
-                Text("Type the first letter").font(.subheadline)
-                Text("of word \(min(idx + 1, words.count))").font(.caption).foregroundStyle(.secondary)
+                Text(prompt).font(.subheadline)
+                Text(detail).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
         }
@@ -173,7 +251,7 @@ struct ReviewView: View {
                 // A shown word is a miss — forgivable like any other mistake.
                 mistakes.insert(idx)
                 revealed.insert(idx)
-                advance()
+                advanceWord()
             }
             .buttonStyle(.bordered)
             Button("Restart") { reset() }
@@ -181,14 +259,16 @@ struct ReviewView: View {
         }
     }
 
-    // MARK: grading
+    // MARK: grading (reference revealed only now that the test is over)
 
     private var gradeBlock: some View {
         VStack(spacing: 10) {
+            Text(verse.reference).font(.title3).bold()
+                .frame(maxWidth: .infinity, alignment: .leading)
             HStack {
                 Image(systemName: mistakeCount == 0 ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                     .foregroundStyle(mistakeCount == 0 ? .green : .orange)
-                Text("\(words.count) words · \(mistakeText)\(forgiven.isEmpty ? "" : " (\(forgiven.count) forgiven)")")
+                Text("\(mistakeText)\(forgivenTotal == 0 ? "" : " (\(forgivenTotal) forgiven)")")
                     .font(.headline)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -261,30 +341,53 @@ struct ReviewView: View {
             entry = ""
             return
         }
-        for ch in new where ch.isLetter {
-            if done { break }
-            check(letter: ch)
+        if !wordsDone {
+            for ch in new where ch.isLetter || ch.isNumber {
+                if wordsDone { break }
+                checkWord(letter: ch)
+            }
+        } else {
+            for ch in new {
+                if done { break }
+                checkRef(char: ch)
+            }
         }
         entry = ""
     }
 
-    private func check(letter: Character) {
+    private func checkWord(letter: Character) {
         let want = verse.hints[idx].lowercased()
         if String(letter).lowercased() == want {
             revealed.insert(idx)
-            let gen = UIImpactFeedbackGenerator(style: .light)
-            gen.impactOccurred()
-            advance()
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            advanceWord()
         } else {
             mistakes.insert(idx)
             revealed.insert(idx)
             buzzError()
-            advance()
+            advanceWord()
         }
     }
 
-    private func advance() {
+    private func advanceWord() {
         idx += 1
+        if done { entryFocused = false }
+    }
+
+    private func checkRef(char: Character) {
+        let i = refShown.firstIndex(of: false) ?? refExpected.count
+        guard i < refExpected.count else { return }
+        let want = refExpected[i]
+        let match: Bool = want.first?.isNumber == true
+            ? String(char) == want
+            : String(char).lowercased() == want.lowercased()
+        refShown[i] = true
+        if match {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        } else {
+            refWrong.insert(i)
+            buzzError()
+        }
         if done { entryFocused = false }
     }
 
@@ -298,10 +401,17 @@ struct ReviewView: View {
         entryFocused = true
     }
 
+    private func toggleRefForgiven(_ i: Int) {
+        if refForgiven.contains(i) { refForgiven.remove(i) } else { refForgiven.insert(i) }
+        entryFocused = true
+    }
+
     private func forgiveLatestMistake() {
-        // Shake forgives the most recent unforgiven mistake.
+        // Shake forgives the most recent unforgiven mistake (words, then reference).
         if let last = mistakes.subtracting(forgiven).sorted().last {
             forgiven.insert(last)
+        } else if let last = refWrong.subtracting(refForgiven).sorted().last {
+            refForgiven.insert(last)
         }
     }
 
@@ -310,6 +420,9 @@ struct ReviewView: View {
         revealed = []
         mistakes = []
         forgiven = []
+        refShown = Array(repeating: false, count: refExpected.count)
+        refWrong = []
+        refForgiven = []
         entry = ""
         graded = nil
         entryFocused = true
