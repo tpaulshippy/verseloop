@@ -29,7 +29,7 @@ Tester: each word shows only its **first letter**; tap to peek, tap again to hid
 
 - Zero dependencies, SwiftUI only, offline-first JSON store (<100 KB typical)
 - No web views, no media, no analytics SDKs
-- Cold start on iPhone SE (3rd gen) simulator: **< 1 s** to interactive Loop; app bundle **< 5 MB** (thin)
+- Cold start on iPhone SE (3rd gen) simulator: **< 1 s** to interactive Loop; app bundle **1.4 MB** (vs Versify's 36.7 MB download)
 - One network call per verse add (cached forever locally); reviews are pure local computation
 
 ## Project layout
