@@ -40,8 +40,8 @@ struct FlowLayout: Layout {
 /// - the REFERENCE IS HIDDEN and no counts are shown
 /// - one seamless stream: type each word's first letter, then — without
 ///   breaking stride — the book initial and the numbers (colon skipped).
-///   "tlimsisnwp231" flows in as one session, reference rendering inline
-///   under the verse just like the words.
+///   "tlimsisnwp231" flows in as one session; the reference composes
+///   inline as "Psalm 23:1", styled just like the verse words.
 /// - right character -> appears; wrong -> buzz, red mistake, move on
 /// - every mistake carries its own "accidental?" forgiveness toggle
 /// - mistake count shown instead of a progress bar
@@ -51,7 +51,7 @@ struct ReviewView: View {
     @EnvironmentObject var store: VerseStore
     var verse: Verse
 
-    // One unified stream: word indices 0..<words.count, then reference chars.
+    // One unified stream: word indices 0..<words.count, then reference slots.
     @State private var idx = 0
     @State private var revealed: Set<Int> = []
     @State private var mistakes: Set<Int> = []
@@ -64,21 +64,38 @@ struct ReviewView: View {
 
     private var words: [String] { verse.words }
 
-    /// Reference challenge: book initial, then every digit (colon skipped).
+    /// "Psalm 23:1" -> book "Psalm", chapter "23", verse "1".
     /// Parenthetical suffixes (e.g. demo labels) are stripped first.
-    private var refExpected: [String] {
-        let core = verse.reference.split(separator: "(").first.map(String.init) ?? verse.reference
-        var out: [String] = []
-        if let firstLetter = core.first(where: { $0.isLetter }) {
-            out.append(String(firstLetter))
+    private var refParts: (book: String, chapter: String, verse: String, hasColon: Bool) {
+        let core = verse.reference.split(separator: "(").first
+            .map { $0.trimmingCharacters(in: .whitespaces) } ?? verse.reference
+        guard let lastSpace = core.lastIndex(of: " "),
+              lastSpace < core.index(before: core.endIndex) else {
+            return (core, "", "", false) // e.g. "Jude": book only
         }
-        out.append(contentsOf: core.filter(\.isNumber).map(String.init))
+        let book = String(core[..<lastSpace]).trimmingCharacters(in: .whitespaces)
+        let tail = String(core[core.index(after: lastSpace)...])
+        if let colon = tail.firstIndex(of: ":") {
+            return (book, String(tail[..<colon]), String(tail[tail.index(after: colon)...]), true)
+        }
+        return (book, tail, "", false)
+    }
+
+    /// Typing stream for the reference: book initial, then tail digits.
+    private var refExpected: [String] {
+        let p = refParts
+        var out: [String] = []
+        if let initial = p.book.first(where: { $0.isLetter }) {
+            out.append(String(initial))
+        }
+        out.append(contentsOf: (p.chapter + p.verse).map(String.init))
         return out
     }
 
     private var total: Int { words.count + refExpected.count }
     private var done: Bool { idx >= total }
     private var inReference: Bool { idx >= words.count && !done }
+    private var refStarted: Bool { revealed.contains(where: { $0 >= words.count }) }
     private var mistakeCount: Int { mistakes.subtracting(forgiven).count }
     private var mistakeText: String { mistakeCount == 1 ? "1 mistake" : "\(mistakeCount) mistakes" }
     private var suggested: String {
@@ -87,12 +104,7 @@ struct ReviewView: View {
         return "Hard"
     }
 
-    /// Display text for a revealed stream item.
-    private func text(for i: Int) -> String {
-        i < words.count ? words[i] : refExpected[i - words.count]
-    }
-
-    /// Expected input character for a stream item.
+    /// Stream index -> expected input character.
     private func want(for i: Int) -> String {
         i < words.count ? verse.hints[i] : refExpected[i - words.count]
     }
@@ -104,11 +116,14 @@ struct ReviewView: View {
             : String(typed).lowercased() == want.lowercased()
     }
 
+    private func isMistake(_ i: Int) -> Bool { mistakes.contains(i) && !forgiven.contains(i) }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
                 passage
+                if refStarted { referenceRow }
                 if !done {
                     inputRow(
                         prompt: inReference ? "Type the reference" : "Type the first letter",
@@ -133,52 +148,106 @@ struct ReviewView: View {
         .onAppear { entryFocused = true }
     }
 
-    // MARK: header — mistake count only (no reference, no counts, no progress bar)
+    // MARK: header — due state + mistake count only
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                DueBadge(review: store.review(for: verse.id))
-                Text("· \(mistakeText)")
-                    .font(.caption).bold(mistakeCount > 0)
-                    .foregroundStyle(mistakeCount > 0 ? Color.red : Color.secondary)
-                Spacer()
-            }
-            Text("Type the first letter of each word, then the reference — one flow. Wrong letters buzz and mark red mistakes; tap any red word to forgive a slip.")
-                .font(.caption).foregroundStyle(.secondary)
+        HStack {
+            DueBadge(review: store.review(for: verse.id))
+            Text("· \(mistakeText)")
+                .font(.caption).bold(mistakeCount > 0)
+                .foregroundStyle(mistakeCount > 0 ? Color.red : Color.secondary)
+            Spacer()
         }
     }
 
-    // MARK: passage — revealed items flow as one paragraph, mistakes in red
+    // MARK: passage — revealed words flow as one paragraph, mistakes in red
 
     private var passage: some View {
         FlowLayout(horizontalSpacing: 8, verticalSpacing: 10) {
-            ForEach(0..<total, id: \.self) { i in
+            ForEach(Array(words.enumerated()), id: \.offset) { i, word in
                 if revealed.contains(i) {
-                    let isMistake = mistakes.contains(i) && !forgiven.contains(i)
-                    let isForgiven = mistakes.contains(i) && forgiven.contains(i)
-                    let word = text(for: i)
-                    Button {
-                        if mistakes.contains(i) { toggleForgiven(i) }
-                    } label: {
-                        VStack(spacing: 0) {
-                            Text(word)
-                                .font(.title3)
-                                .foregroundStyle(isMistake ? Color.red : Color.primary)
-                            if isMistake {
-                                Text("accidental?").font(.caption2).foregroundStyle(.secondary)
-                            } else if isForgiven {
-                                Text("accidental ✓").font(.caption2).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!mistakes.contains(i))
-                    .accessibilityLabel(isMistake ? "Mark accidental: \(word)" : (isForgiven ? "Accidental, tap to unmark: \(word)" : word))
+                    mistakeChip(label: word, index: i)
                 }
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 60, alignment: .topLeading)
+    }
+
+    // MARK: reference — composes inline as "Psalm 23:1", styled like words
+
+    private var referenceRow: some View {
+        let p = refParts
+        let w = words.count
+        // Stream slot 0 reveals the whole book name; the rest reveal per digit.
+        let bookSlot = w
+        let chapterBase = w + 1
+        let verseBase = chapterBase + p.chapter.count
+        return HStack(alignment: .top, spacing: 0) {
+            if revealed.contains(bookSlot) {
+                mistakeChip(label: p.book, index: bookSlot)
+                Text(" ").font(.title3)
+            }
+            if !p.chapter.isEmpty && chapterStarted {
+                HStack(spacing: 2) {
+                    ForEach(Array(p.chapter.enumerated()), id: \.offset) { j, ch in
+                        let i = chapterBase + j
+                        if revealed.contains(i) {
+                            mistakeChip(label: String(ch), index: i, refTag: i)
+                        }
+                    }
+                }
+            }
+            if p.hasColon && chapterComplete {
+                Text(":").font(.title3).foregroundStyle(.secondary)
+            }
+            if !p.verse.isEmpty {
+                HStack(spacing: 2) {
+                    ForEach(Array(p.verse.enumerated()), id: \.offset) { j, ch in
+                        let i = verseBase + j
+                        if revealed.contains(i) {
+                            mistakeChip(label: String(ch), index: i, refTag: i)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var chapterComplete: Bool {
+        let p = refParts
+        let chapterBase = words.count + 1
+        return !p.chapter.isEmpty && (0..<p.chapter.count).allSatisfy { revealed.contains(chapterBase + $0) }
+    }
+
+    private var chapterStarted: Bool {
+        let p = refParts
+        let chapterBase = words.count + 1
+        return !p.chapter.isEmpty && (0..<p.chapter.count).contains(where: { revealed.contains(chapterBase + $0) })
+    }
+
+    /// A revealed item: full color normally, red with an "accidental?"
+    /// affordance while it's an unforgiven mistake. Forgiven items render
+    /// plain (tap again to unmark).
+    private func mistakeChip(label: String, index i: Int, refTag: Int? = nil) -> some View {
+        let bad = isMistake(i)
+        let wasBad = mistakes.contains(i)
+        return Button {
+            if wasBad { toggleForgiven(i) }
+        } label: {
+            VStack(spacing: 0) {
+                Text(label)
+                    .font(.title3)
+                    .foregroundStyle(bad ? Color.red : Color.primary)
+                if bad {
+                    Text("accidental?").font(.caption2).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(!wasBad)
+        .accessibilityLabel(bad
+            ? (refTag == nil ? "Mark accidental: \(label)" : "Mark accidental ref \(refTag!)")
+            : (mistakes.contains(i) ? "Accidental, tap to unmark" : label))
     }
 
     // MARK: input

@@ -14,7 +14,7 @@ Built as an alternative to Versify for that single workflow. It is deliberately 
 | Progress bar, no mistake accounting | No progress bar — a **mistake count** in the header, net of forgiven slips, plus a suggested grade |
 | Library stuck on-device | **JSON export/import + optional Worker sync code** — same code on two devices, push/pull |
 
-Tester: the reference stays **hidden** and no word counts are shown. **Type the first letter** of each word, one at a time — then, without breaking stride, the **reference: book initial, then numbers** (colon skipped). `tlimsisnwp231` flows in as one session, the reference rendering inline under the verse just like the words. Right character → it appears; wrong → haptic buzz, red mistake, move on. Every mistake carries its own "accidental?" toggle (shake forgives the latest too). Then see mistakes + a suggested grade, and grade. Grades get an **8-second Undo** too. Full dark-mode support throughout.
+Tester: the reference stays **hidden** and no word counts are shown. **Type the first letter** of each word, one at a time — then, without breaking stride, the **reference: book initial, then numbers** (colon skipped). `tlimsisnwp231` flows in as one session, the reference composing inline as **Psalm 23:1**, styled just like the words. Right character → it appears; wrong → haptic buzz, red mistake, move on. Every mistake carries its own "accidental?" toggle (shake forgives the latest too). No instruction chrome — just due state and mistake count. Then see mistakes + a suggested grade, and grade. Grades get an **8-second Undo** too. Full dark-mode support throughout.
 
 ## ESV-only, legally
 
