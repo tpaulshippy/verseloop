@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- TestFlight / App Store export. Replace TEAMID with your 10-character
+	     Team ID (developer.apple.com > Account > Membership), or export via
+	     Xcode Organizer which fills this in for you. -->
+	<key>method</key>
+	<string>app-store</string>
+	<key>teamID</key>
+	<string>TEAMID</string>
+	<key>uploadSymbols</key>
+	<true/>
+	<key>uploadBitcode</key>
+	<false/>
+	<key>signingStyle</key>
+	<string>automatic</string>
+</dict>
+</plist>

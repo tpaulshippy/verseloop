@@ -58,6 +58,18 @@ xcodebuild -project VerseLoop.xcodeproj -target VerseLoop -configuration Debug \
 
 No signing team needed for simulator. For your physical SE3: open `VerseLoop.xcodeproj` in Xcode, select the VerseLoop target → Signing, add your Apple ID team, connect the phone, Run. Deployment target is iOS 17.0 so SE3 is fully supported.
 
+## TestFlight (onto your iPhone SE3)
+
+Prereqs: paid Apple Developer membership + the app's bundle ID (`com.tpaulshippy.verseloop`) registered to your team (Xcode automatic signing does this).
+
+1. **App Store Connect**: [apps](https://appstoreconnect.apple.com/apps) → **+** → New App → name `VerseLoop`, bundle ID `com.tpaulshippy.verseloop`, SKU `verseloop`.
+2. **Archive**: in Xcode set the VerseLoop target's team, then Product → Archive (Release). Or run `./scripts/archive-testflight.sh` after putting your Team ID in `scripts/ExportOptions.plist`.
+3. **Distribute**: Organizer → Distribute App → TestFlight & App Store → upload. Wait for processing (~10–60 min; you'll get an email).
+4. **Testers**: App Store Connect → your app → TestFlight → add yourself as an **internal tester** (no beta review needed). Install Apple's **TestFlight** app on the SE3, accept the invite.
+5. **First launch on device**: Settings → ESV API key *or* Worker URL, then add verses. The two KJV demo verses work with zero setup.
+
+Every re-upload needs a new build number: bump `CURRENT_PROJECT_VERSION` in the project (1 → 2 → 3…). External testers (other people) require passing Beta App Review first — internal testing does not.
+
 ## Worker (optional but recommended, free tier)
 
 ```bash
