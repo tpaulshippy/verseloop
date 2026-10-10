@@ -1,0 +1,13 @@
+name = "verseloop"
+main = "src/index.ts"
+compatibility_date = "2024-10-01"
+
+# Optional: bind KV for durable multi-device sync (free tier OK).
+# wrangler kv:namespace create SYNC_KV  (then uncomment)
+# [[kv_namespaces]]
+# binding = "SYNC_KV"
+# id = "PASTE_ID_HERE"
+
+[vars]
+# none — secrets below must be set, never committed:
+#   wrangler secret put ESV_API_TOKEN   (free ESV key from https://api.esv.org)

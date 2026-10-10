@@ -1,0 +1,412 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+		AAA111111111111111111111 = {
+			isa = PBXProject;
+			buildConfigurationList = FFF000000000000000000001;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en);
+			mainGroup = AAA111111111111111111112;
+			productRefGroup = AAA111111111111111111114;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				BBB222222222222222222221,
+				BBB222222222222222222231
+			);
+			attributes = {
+				TargetAttributes = {
+					BBB222222222222222222231 = {
+						TestTargetID = BBB222222222222222222221;
+					};
+				};
+			};
+		};
+		AAA111111111111111111112 = {
+			isa = PBXGroup;
+			children = (
+				AAA111111111111111111113,
+				AAA111111111111111111114,
+				AAA111111111111111111115
+			);
+			sourceTree = "<group>";
+		};
+		AAA111111111111111111115 = {
+			isa = PBXGroup;
+			children = (DDD100000000000000000011);
+			path = VerseLoopUITests;
+			sourceTree = "<group>";
+		};
+		AAA111111111111111111113 = {
+			isa = PBXGroup;
+			children = (
+				DDD100000000000000000001,
+				DDD100000000000000000002,
+				DDD100000000000000000003,
+				DDD100000000000000000004,
+				DDD100000000000000000005,
+				DDD100000000000000000006,
+				DDD100000000000000000007,
+				DDD100000000000000000008
+			);
+			path = VerseLoop;
+			sourceTree = "<group>";
+		};
+		AAA111111111111111111114 = {
+			isa = PBXGroup;
+			children = (BBB222222222222222222222);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		BBB222222222222222222221 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = GGG000000000000000000001;
+			buildPhases = (
+				EEE100000000000000000001,
+				EEE100000000000000000002,
+				EEE100000000000000000003
+			);
+			buildRules = ();
+			dependencies = ();
+			name = VerseLoop;
+			packageProductDependencies = ();
+			productName = VerseLoop;
+			productReference = BBB222222222222222222222;
+			productType = "com.apple.product-type.application";
+		};
+		BBB222222222222222222222 = {
+			isa = PBXFileReference;
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			path = "VerseLoop.app";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		BBB222222222222222222231 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = GGG000000000000000000011;
+			buildPhases = (
+				EEE100000000000000000011,
+				EEE100000000000000000012
+			);
+			buildRules = ();
+			dependencies = (CCC333333333333333333341);
+			name = VerseLoopUITests;
+			packageProductDependencies = ();
+			productName = VerseLoopUITests;
+			productReference = BBB222222222222222222232;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		BBB222222222222222222232 = {
+			isa = PBXFileReference;
+			explicitFileType = "wrapper.cfbundle";
+			includeInIndex = 0;
+			path = "VerseLoopUITests.xctest";
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		CCC333333333333333333331 = {
+			isa = PBXBuildFile;
+			fileRef = DDD100000000000000000001;
+		};
+		CCC333333333333333333332 = {
+			isa = PBXBuildFile;
+			fileRef = DDD100000000000000000002;
+		};
+		CCC333333333333333333333 = {
+			isa = PBXBuildFile;
+			fileRef = DDD100000000000000000003;
+		};
+		CCC333333333333333333334 = {
+			isa = PBXBuildFile;
+			fileRef = DDD100000000000000000004;
+		};
+		CCC333333333333333333335 = {
+			isa = PBXBuildFile;
+			fileRef = DDD100000000000000000005;
+		};
+		CCC333333333333333333336 = {
+			isa = PBXBuildFile;
+			fileRef = DDD100000000000000000006;
+		};
+		CCC333333333333333333337 = {
+			isa = PBXBuildFile;
+			fileRef = DDD100000000000000000008;
+		};
+		CCC333333333333333333341 = {
+			isa = PBXTargetDependency;
+			target = BBB222222222222222222221;
+			targetProxy = CCC333333333333333333342;
+		};
+		CCC333333333333333333342 = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AAA111111111111111111111;
+			proxyType = 1;
+			remoteGlobalIDString = BBB222222222222222222221;
+			remoteInfo = VerseLoop;
+		};
+		CCC333333333333333333351 = {
+			isa = PBXBuildFile;
+			fileRef = DDD100000000000000000011;
+		};
+		DDD100000000000000000001 = {
+			isa = PBXFileReference;
+			lastKnownFileType = "sourcecode.swift";
+			path = "VerseLoopApp.swift";
+			sourceTree = "<group>";
+		};
+		DDD100000000000000000002 = {
+			isa = PBXFileReference;
+			lastKnownFileType = "sourcecode.swift";
+			path = "Models.swift";
+			sourceTree = "<group>";
+		};
+		DDD100000000000000000003 = {
+			isa = PBXFileReference;
+			lastKnownFileType = "sourcecode.swift";
+			path = "VerseStore.swift";
+			sourceTree = "<group>";
+		};
+		DDD100000000000000000004 = {
+			isa = PBXFileReference;
+			lastKnownFileType = "sourcecode.swift";
+			path = "ESVService.swift";
+			sourceTree = "<group>";
+		};
+		DDD100000000000000000005 = {
+			isa = PBXFileReference;
+			lastKnownFileType = "sourcecode.swift";
+			path = "ContentView.swift";
+			sourceTree = "<group>";
+		};
+		DDD100000000000000000006 = {
+			isa = PBXFileReference;
+			lastKnownFileType = "sourcecode.swift";
+			path = "ReviewView.swift";
+			sourceTree = "<group>";
+		};
+		DDD100000000000000000007 = {
+			isa = PBXFileReference;
+			lastKnownFileType = "text.plist.xml";
+			path = "Info.plist";
+			sourceTree = "<group>";
+		};
+		DDD100000000000000000008 = {
+			isa = PBXFileReference;
+			lastKnownFileType = "folder.assetcatalog";
+			path = "Assets.xcassets";
+			sourceTree = "<group>";
+		};
+		DDD100000000000000000011 = {
+			isa = PBXFileReference;
+			lastKnownFileType = "sourcecode.swift";
+			path = "VerseLoopUITests.swift";
+			sourceTree = "<group>";
+		};
+		EEE100000000000000000011 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (CCC333333333333333333351);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EEE100000000000000000012 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EEE100000000000000000001 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CCC333333333333333333331,
+				CCC333333333333333333332,
+				CCC333333333333333333333,
+				CCC333333333333333333334,
+				CCC333333333333333333335,
+				CCC333333333333333333336
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EEE100000000000000000002 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EEE100000000000000000003 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (CCC333333333333333333337);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FFF000000000000000000001 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				HHH100000000000000000001,
+				HHH100000000000000000002
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		GGG000000000000000000001 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				HHH100000000000000000003,
+				HHH100000000000000000004
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		GGG000000000000000000011 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				HHH100000000000000000011,
+				HHH100000000000000000012
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		HHH100000000000000000011 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks"
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.tpaulshippy.verseloop.uitests";
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		HHH100000000000000000012 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks"
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.tpaulshippy.verseloop.uitests";
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		HHH100000000000000000001 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)"
+				);
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		HHH100000000000000000002 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		HHH100000000000000000003 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = "VerseLoop/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks"
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.tpaulshippy.verseloop";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		HHH100000000000000000004 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = "VerseLoop/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks"
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.tpaulshippy.verseloop";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+	};
+	rootObject = AAA111111111111111111111;
+}
