@@ -2,18 +2,23 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- TestFlight / App Store export. Replace TEAMID with your 10-character
-	     Team ID (developer.apple.com > Account > Membership), or export via
-	     Xcode Organizer which fills this in for you. -->
+	<!-- TestFlight / App Store export with manual signing (no cloud signing).
+	     Profile "VerseLoop AppStore" created via API; distribution cert in
+	     /tmp/vl.keychain-db (see archive-testflight.sh). -->
 	<key>method</key>
 	<string>app-store</string>
 	<key>teamID</key>
-	<string>TEAMID</string>
+	<string>KRF39C6NC9</string>
 	<key>uploadSymbols</key>
 	<true/>
 	<key>uploadBitcode</key>
 	<false/>
 	<key>signingStyle</key>
-	<string>automatic</string>
+	<string>manual</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>com.tpaulshippy.verseloop</key>
+		<string>VerseLoop AppStore</string>
+	</dict>
 </dict>
 </plist>

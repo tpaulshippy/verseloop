@@ -3,23 +3,149 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 60;
 	objects = {
-		AAA111111111111111111111 = {
-			isa = PBXProject;
-			buildConfigurationList = FFF000000000000000000001;
-			compatibilityVersion = "Xcode 15.0";
-			developmentRegion = en;
-			hasScannedForEncodings = 0;
-			knownRegions = (en);
-			mainGroup = AAA111111111111111111112;
-			productRefGroup = AAA111111111111111111114;
-			projectDirPath = "";
-			projectRoot = "";
-			targets = (
-				BBB222222222222222222221,
-				BBB222222222222222222231
+
+/* Begin PBXBuildFile section */
+		CCC333333333333333333331 /* VerseLoopApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDD100000000000000000001 /* VerseLoopApp.swift */; };
+		CCC333333333333333333332 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDD100000000000000000002 /* Models.swift */; };
+		CCC333333333333333333333 /* VerseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDD100000000000000000003 /* VerseStore.swift */; };
+		CCC333333333333333333334 /* ESVService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDD100000000000000000004 /* ESVService.swift */; };
+		CCC333333333333333333335 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDD100000000000000000005 /* ContentView.swift */; };
+		CCC333333333333333333336 /* ReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDD100000000000000000006 /* ReviewView.swift */; };
+		CCC333333333333333333337 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DDD100000000000000000008 /* Assets.xcassets */; };
+		CCC333333333333333333351 /* VerseLoopUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDD100000000000000000011 /* VerseLoopUITests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		CCC333333333333333333342 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = AAA111111111111111111111 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BBB222222222222222222221;
+			remoteInfo = VerseLoop;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		BBB222222222222222222222 /* VerseLoop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VerseLoop.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BBB222222222222222222232 /* VerseLoopUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VerseLoopUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DDD100000000000000000001 /* VerseLoopApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerseLoopApp.swift; sourceTree = "<group>"; };
+		DDD100000000000000000002 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		DDD100000000000000000003 /* VerseStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerseStore.swift; sourceTree = "<group>"; };
+		DDD100000000000000000004 /* ESVService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ESVService.swift; sourceTree = "<group>"; };
+		DDD100000000000000000005 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		DDD100000000000000000006 /* ReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewView.swift; sourceTree = "<group>"; };
+		DDD100000000000000000007 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		DDD100000000000000000008 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		DDD100000000000000000011 /* VerseLoopUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerseLoopUITests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		EEE100000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EEE100000000000000000012 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		AAA111111111111111111112 = {
+			isa = PBXGroup;
+			children = (
+				AAA111111111111111111113 /* VerseLoop */,
+				AAA111111111111111111114 /* Products */,
+				AAA111111111111111111115 /* VerseLoopUITests */,
+			);
+			sourceTree = "<group>";
+		};
+		AAA111111111111111111113 /* VerseLoop */ = {
+			isa = PBXGroup;
+			children = (
+				DDD100000000000000000001 /* VerseLoopApp.swift */,
+				DDD100000000000000000002 /* Models.swift */,
+				DDD100000000000000000003 /* VerseStore.swift */,
+				DDD100000000000000000004 /* ESVService.swift */,
+				DDD100000000000000000005 /* ContentView.swift */,
+				DDD100000000000000000006 /* ReviewView.swift */,
+				DDD100000000000000000007 /* Info.plist */,
+				DDD100000000000000000008 /* Assets.xcassets */,
+			);
+			path = VerseLoop;
+			sourceTree = "<group>";
+		};
+		AAA111111111111111111114 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				BBB222222222222222222222 /* VerseLoop.app */,
+				BBB222222222222222222232 /* VerseLoopUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AAA111111111111111111115 /* VerseLoopUITests */ = {
+			isa = PBXGroup;
+			children = (
+				DDD100000000000000000011 /* VerseLoopUITests.swift */,
+			);
+			path = VerseLoopUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		BBB222222222222222222221 /* VerseLoop */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = GGG000000000000000000001 /* Build configuration list for PBXNativeTarget "VerseLoop" */;
+			buildPhases = (
+				EEE100000000000000000001 /* Sources */,
+				EEE100000000000000000002 /* Frameworks */,
+				EEE100000000000000000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VerseLoop;
+			packageProductDependencies = (
+			);
+			productName = VerseLoop;
+			productReference = BBB222222222222222222222 /* VerseLoop.app */;
+			productType = "com.apple.product-type.application";
+		};
+		BBB222222222222222222231 /* VerseLoopUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = GGG000000000000000000011 /* Build configuration list for PBXNativeTarget "VerseLoopUITests" */;
+			buildPhases = (
+				EEE100000000000000000011 /* Sources */,
+				EEE100000000000000000012 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CCC333333333333333333341 /* PBXTargetDependency */,
+			);
+			name = VerseLoopUITests;
+			packageProductDependencies = (
+			);
+			productName = VerseLoopUITests;
+			productReference = BBB222222222222222222232 /* VerseLoopUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		AAA111111111111111111111 /* Project object */ = {
+			isa = PBXProject;
 			attributes = {
 				TargetAttributes = {
 					BBB222222222222222222231 = {
@@ -27,293 +153,69 @@
 					};
 				};
 			};
-		};
-		AAA111111111111111111112 = {
-			isa = PBXGroup;
-			children = (
-				AAA111111111111111111113,
-				AAA111111111111111111114,
-				AAA111111111111111111115
+			buildConfigurationList = FFF000000000000000000001 /* Build configuration list for PBXProject "VerseLoop" */;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
 			);
-			sourceTree = "<group>";
-		};
-		AAA111111111111111111115 = {
-			isa = PBXGroup;
-			children = (DDD100000000000000000011);
-			path = VerseLoopUITests;
-			sourceTree = "<group>";
-		};
-		AAA111111111111111111113 = {
-			isa = PBXGroup;
-			children = (
-				DDD100000000000000000001,
-				DDD100000000000000000002,
-				DDD100000000000000000003,
-				DDD100000000000000000004,
-				DDD100000000000000000005,
-				DDD100000000000000000006,
-				DDD100000000000000000007,
-				DDD100000000000000000008
+			mainGroup = AAA111111111111111111112;
+			productRefGroup = AAA111111111111111111114 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				BBB222222222222222222221 /* VerseLoop */,
+				BBB222222222222222222231 /* VerseLoopUITests */,
 			);
-			path = VerseLoop;
-			sourceTree = "<group>";
 		};
-		AAA111111111111111111114 = {
-			isa = PBXGroup;
-			children = (BBB222222222222222222222);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		BBB222222222222222222221 = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = GGG000000000000000000001;
-			buildPhases = (
-				EEE100000000000000000001,
-				EEE100000000000000000002,
-				EEE100000000000000000003
-			);
-			buildRules = ();
-			dependencies = ();
-			name = VerseLoop;
-			packageProductDependencies = ();
-			productName = VerseLoop;
-			productReference = BBB222222222222222222222;
-			productType = "com.apple.product-type.application";
-		};
-		BBB222222222222222222222 = {
-			isa = PBXFileReference;
-			explicitFileType = wrapper.application;
-			includeInIndex = 0;
-			path = "VerseLoop.app";
-			sourceTree = BUILT_PRODUCTS_DIR;
-		};
-		BBB222222222222222222231 = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = GGG000000000000000000011;
-			buildPhases = (
-				EEE100000000000000000011,
-				EEE100000000000000000012
-			);
-			buildRules = ();
-			dependencies = (CCC333333333333333333341);
-			name = VerseLoopUITests;
-			packageProductDependencies = ();
-			productName = VerseLoopUITests;
-			productReference = BBB222222222222222222232;
-			productType = "com.apple.product-type.bundle.ui-testing";
-		};
-		BBB222222222222222222232 = {
-			isa = PBXFileReference;
-			explicitFileType = "wrapper.cfbundle";
-			includeInIndex = 0;
-			path = "VerseLoopUITests.xctest";
-			sourceTree = BUILT_PRODUCTS_DIR;
-		};
-		CCC333333333333333333331 = {
-			isa = PBXBuildFile;
-			fileRef = DDD100000000000000000001;
-		};
-		CCC333333333333333333332 = {
-			isa = PBXBuildFile;
-			fileRef = DDD100000000000000000002;
-		};
-		CCC333333333333333333333 = {
-			isa = PBXBuildFile;
-			fileRef = DDD100000000000000000003;
-		};
-		CCC333333333333333333334 = {
-			isa = PBXBuildFile;
-			fileRef = DDD100000000000000000004;
-		};
-		CCC333333333333333333335 = {
-			isa = PBXBuildFile;
-			fileRef = DDD100000000000000000005;
-		};
-		CCC333333333333333333336 = {
-			isa = PBXBuildFile;
-			fileRef = DDD100000000000000000006;
-		};
-		CCC333333333333333333337 = {
-			isa = PBXBuildFile;
-			fileRef = DDD100000000000000000008;
-		};
-		CCC333333333333333333341 = {
-			isa = PBXTargetDependency;
-			target = BBB222222222222222222221;
-			targetProxy = CCC333333333333333333342;
-		};
-		CCC333333333333333333342 = {
-			isa = PBXContainerItemProxy;
-			containerPortal = AAA111111111111111111111;
-			proxyType = 1;
-			remoteGlobalIDString = BBB222222222222222222221;
-			remoteInfo = VerseLoop;
-		};
-		CCC333333333333333333351 = {
-			isa = PBXBuildFile;
-			fileRef = DDD100000000000000000011;
-		};
-		DDD100000000000000000001 = {
-			isa = PBXFileReference;
-			lastKnownFileType = "sourcecode.swift";
-			path = "VerseLoopApp.swift";
-			sourceTree = "<group>";
-		};
-		DDD100000000000000000002 = {
-			isa = PBXFileReference;
-			lastKnownFileType = "sourcecode.swift";
-			path = "Models.swift";
-			sourceTree = "<group>";
-		};
-		DDD100000000000000000003 = {
-			isa = PBXFileReference;
-			lastKnownFileType = "sourcecode.swift";
-			path = "VerseStore.swift";
-			sourceTree = "<group>";
-		};
-		DDD100000000000000000004 = {
-			isa = PBXFileReference;
-			lastKnownFileType = "sourcecode.swift";
-			path = "ESVService.swift";
-			sourceTree = "<group>";
-		};
-		DDD100000000000000000005 = {
-			isa = PBXFileReference;
-			lastKnownFileType = "sourcecode.swift";
-			path = "ContentView.swift";
-			sourceTree = "<group>";
-		};
-		DDD100000000000000000006 = {
-			isa = PBXFileReference;
-			lastKnownFileType = "sourcecode.swift";
-			path = "ReviewView.swift";
-			sourceTree = "<group>";
-		};
-		DDD100000000000000000007 = {
-			isa = PBXFileReference;
-			lastKnownFileType = "text.plist.xml";
-			path = "Info.plist";
-			sourceTree = "<group>";
-		};
-		DDD100000000000000000008 = {
-			isa = PBXFileReference;
-			lastKnownFileType = "folder.assetcatalog";
-			path = "Assets.xcassets";
-			sourceTree = "<group>";
-		};
-		DDD100000000000000000011 = {
-			isa = PBXFileReference;
-			lastKnownFileType = "sourcecode.swift";
-			path = "VerseLoopUITests.swift";
-			sourceTree = "<group>";
-		};
-		EEE100000000000000000011 = {
-			isa = PBXSourcesBuildPhase;
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		EEE100000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = (CCC333333333333333333351);
+			files = (
+				CCC333333333333333333337 /* Assets.xcassets in Resources */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		EEE100000000000000000012 = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = ();
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		EEE100000000000000000001 = {
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		EEE100000000000000000001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				CCC333333333333333333331,
-				CCC333333333333333333332,
-				CCC333333333333333333333,
-				CCC333333333333333333334,
-				CCC333333333333333333335,
-				CCC333333333333333333336
+				CCC333333333333333333331 /* VerseLoopApp.swift in Sources */,
+				CCC333333333333333333332 /* Models.swift in Sources */,
+				CCC333333333333333333333 /* VerseStore.swift in Sources */,
+				CCC333333333333333333334 /* ESVService.swift in Sources */,
+				CCC333333333333333333335 /* ContentView.swift in Sources */,
+				CCC333333333333333333336 /* ReviewView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		EEE100000000000000000002 = {
-			isa = PBXFrameworksBuildPhase;
+		EEE100000000000000000011 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = ();
+			files = (
+				CCC333333333333333333351 /* VerseLoopUITests.swift in Sources */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		EEE100000000000000000003 = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (CCC333333333333333333337);
-			runOnlyForDeploymentPostprocessing = 0;
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		CCC333333333333333333341 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BBB222222222222222222221 /* VerseLoop */;
+			targetProxy = CCC333333333333333333342 /* PBXContainerItemProxy */;
 		};
-		FFF000000000000000000001 = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				HHH100000000000000000001,
-				HHH100000000000000000002
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		GGG000000000000000000001 = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				HHH100000000000000000003,
-				HHH100000000000000000004
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		GGG000000000000000000011 = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				HHH100000000000000000011,
-				HHH100000000000000000012
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		HHH100000000000000000011 = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@loader_path/Frameworks"
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.tpaulshippy.verseloop.uitests";
-				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		HHH100000000000000000012 = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@loader_path/Frameworks"
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.tpaulshippy.verseloop.uitests";
-				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
-		HHH100000000000000000001 = {
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		HHH100000000000000000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -323,7 +225,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
@@ -331,7 +233,7 @@
 				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
-					"$(inherited)"
+					"$(inherited)",
 				);
 				MARKETING_VERSION = 1.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
@@ -343,7 +245,7 @@
 			};
 			name = Debug;
 		};
-		HHH100000000000000000002 = {
+		HHH100000000000000000002 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -353,7 +255,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CLANG_ENABLE_OBJC_ARC = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -367,46 +269,121 @@
 			};
 			name = Release;
 		};
-		HHH100000000000000000003 = {
+		HHH100000000000000000003 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				INFOPLIST_FILE = "VerseLoop/Info.plist";
+				DEVELOPMENT_TEAM = KRF39C6NC9;
+				INFOPLIST_FILE = VerseLoop/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
-					"@executable_path/Frameworks"
+					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.tpaulshippy.verseloop";
+				PRODUCT_BUNDLE_IDENTIFIER = com.tpaulshippy.verseloop;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
-		HHH100000000000000000004 = {
+		HHH100000000000000000004 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				INFOPLIST_FILE = "VerseLoop/Info.plist";
+				DEVELOPMENT_TEAM = KRF39C6NC9;
+				INFOPLIST_FILE = VerseLoop/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
-					"@executable_path/Frameworks"
+					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.tpaulshippy.verseloop";
+				PRODUCT_BUNDLE_IDENTIFIER = com.tpaulshippy.verseloop;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
+		HHH100000000000000000011 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tpaulshippy.verseloop.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		HHH100000000000000000012 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.tpaulshippy.verseloop.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		FFF000000000000000000001 /* Build configuration list for PBXProject "VerseLoop" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				HHH100000000000000000001 /* Debug */,
+				HHH100000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		GGG000000000000000000001 /* Build configuration list for PBXNativeTarget "VerseLoop" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				HHH100000000000000000003 /* Debug */,
+				HHH100000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		GGG000000000000000000011 /* Build configuration list for PBXNativeTarget "VerseLoopUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				HHH100000000000000000011 /* Debug */,
+				HHH100000000000000000012 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
 	};
-	rootObject = AAA111111111111111111111;
+	rootObject = AAA111111111111111111111 /* Project object */;
 }
