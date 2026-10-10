@@ -1,37 +1,83 @@
 import SwiftUI
+import UIKit
+import AudioToolbox
 
-/// First-letter tester with forgiving taps:
-/// - tap a word to peek (marked, not punished)
-/// - Oops button / shake undoes the last tap
+/// Flowing-text wrapper so revealed words read like a paragraph.
+struct FlowLayout: Layout {
+    var horizontalSpacing: CGFloat = 8
+    var verticalSpacing: CGFloat = 10
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard !subviews.isEmpty else { return .zero }
+        let maxWidth = proposal.width ?? .infinity
+        var x: CGFloat = 0, y: CGFloat = 0, rowH: CGFloat = 0
+        for v in subviews {
+            let s = v.sizeThatFits(.unspecified)
+            if x > 0 && x + s.width > maxWidth {
+                x = 0; y += rowH + verticalSpacing; rowH = 0
+            }
+            rowH = max(rowH, s.height)
+            x += s.width + horizontalSpacing
+        }
+        return CGSize(width: maxWidth.isInfinite ? x : maxWidth, height: y + rowH)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX, y = bounds.minY, rowH: CGFloat = 0
+        for v in subviews {
+            let s = v.sizeThatFits(.unspecified)
+            if x > bounds.minX && x + s.width > bounds.maxX {
+                x = bounds.minX; y += rowH + verticalSpacing; rowH = 0
+            }
+            v.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(s))
+            rowH = max(rowH, s.height)
+            x += s.width + horizontalSpacing
+        }
+    }
+}
+
+/// Type-the-first-letter tester (matches the Versify "Type" flow):
+/// - words reveal one at a time as you type each first letter
+/// - right letter -> word appears, move on
+/// - wrong letter -> vibrate, word appears red as a mistake, move on
+/// - every mistake carries its own "accidental?" forgiveness toggle
+/// - mistake count shown instead of a progress bar
 /// - grade is ALWAYS explicit (Again/Hard/Good/Easy) -> true SM-2
-/// - "taps were accidental" zeroes peek influence on that grade
 /// - every grade has an 8s Undo
 struct ReviewView: View {
     @EnvironmentObject var store: VerseStore
     var verse: Verse
 
-    @State private var peeked: Set<Int> = []
-    @State private var tapHistory: [TapEvent] = []
-    @State private var revealAll = false
-    @State private var accidental = false
+    @State private var idx = 0
+    @State private var revealed: Set<Int> = []
+    @State private var mistakes: Set<Int> = []
+    @State private var forgiven: Set<Int> = []
+    @State private var entry = ""
+    @FocusState private var entryFocused: Bool
     @State private var graded: Grade?
-    @State private var undoDeadline: Date?
     @Environment(\.dismiss) var dismiss
 
-    enum TapEvent: Equatable {
-        case peek(Int)
-        case revealAll(Set<Int>)
-        case hideAll(Set<Int>)
+    private var words: [String] { verse.words }
+    private var done: Bool { idx >= words.count }
+    private var mistakeCount: Int { mistakes.subtracting(forgiven).count }
+    private var mistakeText: String { mistakeCount == 1 ? "1 mistake" : "\(mistakeCount) mistakes" }
+    private var suggested: String {
+        if mistakeCount == 0 { return "Easy" }
+        if mistakeCount <= 2 { return "Good" }
+        return "Hard"
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
-                chips
-                controls
+                passage
+                if !done {
+                    inputRow
+                    controls
+                }
                 if graded == nil {
-                    gradeBlock
+                    if done { gradeBlock }
                 } else {
                     gradedBlock
                 }
@@ -42,77 +88,96 @@ struct ReviewView: View {
         .navigationBarTitleDisplayMode(.inline)
         .background(ShakeDetector().frame(width: 0, height: 0))
         .onReceive(NotificationCenter.default.publisher(for: .deviceDidShake)) { _ in
-            undoLastTap()
+            forgiveLatestMistake()
         }
+        .onAppear { entryFocused = true }
     }
 
-    // MARK: header
+    // MARK: header — mistake count, no progress bar
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 DueBadge(review: store.review(for: verse.id))
-                Text("\(verse.words.count) words").font(.caption).foregroundStyle(.secondary)
-                Text("· \(peeked.count) peeked").font(.caption).foregroundStyle(peeked.isEmpty ? Color.secondary : Color.orange)
+                Text(done ? "\(words.count) of \(words.count)" : "word \(min(idx + 1, words.count)) of \(words.count)")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("· \(mistakeText)")
+                    .font(.caption).bold(mistakeCount > 0)
+                    .foregroundStyle(mistakeCount > 0 ? Color.red : Color.secondary)
                 Spacer()
             }
-            Text("Say it aloud from first letters, then peek to check. Taps never fail you — only your grade moves the schedule.")
+            Text("Type the first letter of each word. Wrong letter buzzes and marks a mistake — tap any red word to forgive a slip.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
 
-    // MARK: chips
+    // MARK: passage — revealed words only, mistakes in red
 
-    private var chips: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 8)], spacing: 8) {
-            ForEach(Array(verse.words.enumerated()), id: \.offset) { i, word in
-                let shown = revealAll || peeked.contains(i)
-                Button {
-                    togglePeek(i)
-                } label: {
-                    Text(shown ? word : verse.hints[i])
-                        .font(shown ? .body : .system(.title3, design: .rounded).bold())
-                        .monospaced(shown ? false : true)
-                        .lineLimit(shown ? 3 : 1)
-                        .minimumScaleFactor(0.7)
-                        .frame(minWidth: 56, minHeight: 44)
-                        .padding(.horizontal, 6)
-                        .background(shown ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(shown ? Color.accentColor : Color.clear, lineWidth: 1.5)
-                        )
+    private var passage: some View {
+        FlowLayout(horizontalSpacing: 8, verticalSpacing: 10) {
+            ForEach(Array(words.enumerated()), id: \.offset) { i, word in
+                if revealed.contains(i) {
+                    let isMistake = mistakes.contains(i) && !forgiven.contains(i)
+                    let isForgiven = mistakes.contains(i) && forgiven.contains(i)
+                    Button {
+                        if mistakes.contains(i) { toggleForgiven(i) }
+                    } label: {
+                        VStack(spacing: 0) {
+                            Text(word)
+                                .font(.title3)
+                                .foregroundStyle(isMistake ? Color.red : Color.primary)
+                            if isMistake {
+                                Text("accidental?").font(.caption2).foregroundStyle(.secondary)
+                            } else if isForgiven {
+                                Text("accidental ✓").font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!mistakes.contains(i))
+                    .accessibilityLabel(isMistake ? "Mark accidental: \(word)" : (isForgiven ? "Accidental, tap to unmark: \(word)" : word))
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(shown ? word : "Hidden word starting with \(verse.hints[i])")
             }
+        }
+        .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
+    }
+
+    // MARK: input
+
+    private var inputRow: some View {
+        HStack(spacing: 12) {
+            TextField("first letter…", text: $entry)
+                .accessibilityIdentifier("first-letter-input")
+                .font(.system(.title2, design: .rounded).bold())
+                .multilineTextAlignment(.center)
+                .frame(width: 120)
+                .padding(.vertical, 10)
+                .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                .keyboardType(.asciiCapable)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .focused($entryFocused)
+                .onChange(of: entry) { _, new in processInput(new) }
+                .onSubmit { entry = "" }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Type the first letter").font(.subheadline)
+                Text("of word \(min(idx + 1, words.count))").font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
         }
     }
 
-    // MARK: controls
-
     private var controls: some View {
         HStack(spacing: 10) {
-            Button(revealAll ? "Hide all" : "Reveal all") {
-                if revealAll {
-                    tapHistory.append(.hideAll(peeked))
-                    peeked = []
-                } else {
-                    tapHistory.append(.revealAll(peeked))
-                    peeked = Set(verse.words.indices)
-                }
-                revealAll.toggle()
+            Button("Show word") {
+                // A shown word is a miss — forgivable like any other mistake.
+                mistakes.insert(idx)
+                revealed.insert(idx)
+                advance()
             }
             .buttonStyle(.bordered)
-
-            Button {
-                undoLastTap()
-            } label: {
-                Label("Oops · undo tap", systemImage: "arrow.uturn.backward")
-            }
-            .buttonStyle(.bordered)
-            .disabled(tapHistory.isEmpty)
-            .help("Undoes your last tap — accidental taps cost nothing. Shake also undoes.")
+            Button("Restart") { reset() }
+                .buttonStyle(.bordered)
         }
     }
 
@@ -120,15 +185,16 @@ struct ReviewView: View {
 
     private var gradeBlock: some View {
         VStack(spacing: 10) {
-            Toggle(isOn: $accidental) {
-                VStack(alignment: .leading) {
-                    Text("My taps were accidental").font(.subheadline)
-                    Text("Ignores peeks for this grade").font(.caption).foregroundStyle(.secondary)
-                }
+            HStack {
+                Image(systemName: mistakeCount == 0 ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                    .foregroundStyle(mistakeCount == 0 ? .green : .orange)
+                Text("\(words.count) words · \(mistakeText)\(forgiven.isEmpty ? "" : " (\(forgiven.count) forgiven)")")
+                    .font(.headline)
             }
-            .toggleStyle(.switch)
-
-            Text("How well did you recall it?").font(.headline).frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text("Suggested: \(suggested) — but your grade decides, as always.")
+                .font(.caption).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 ForEach(Grade.allCases, id: \.self) { g in
@@ -142,8 +208,6 @@ struct ReviewView: View {
                     .tint(tint(for: g))
                 }
             }
-            Text("This grade — not your taps — sets the next review. That's the whole fix vs. auto-penalty apps.")
-                .font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -169,7 +233,6 @@ struct ReviewView: View {
                 .frame(maxWidth: .infinity)
         }
         .task {
-            // 8-second undo window
             try? await Task.sleep(nanoseconds: 8_000_000_000)
             store.clearUndoToast()
         }
@@ -190,28 +253,70 @@ struct ReviewView: View {
         }
     }
 
-    // MARK: actions
+    // MARK: typing engine
 
-    private func togglePeek(_ i: Int) {
-        if peeked.contains(i) { peeked.remove(i) } else { peeked.insert(i) }
-        tapHistory.append(.peek(i))
-        revealAll = peeked.count == verse.words.count
+    private func processInput(_ new: String) {
+        guard !new.isEmpty, !done else {
+            if new.isEmpty { return }
+            entry = ""
+            return
+        }
+        for ch in new where ch.isLetter {
+            if done { break }
+            check(letter: ch)
+        }
+        entry = ""
     }
 
-    private func undoLastTap() {
-        guard let last = tapHistory.popLast() else { return }
-        switch last {
-        case .peek(let i):
-            // toggle back
-            if peeked.contains(i) { peeked.remove(i) } else { peeked.insert(i) }
-        case .revealAll(let prev), .hideAll(let prev):
-            peeked = prev
+    private func check(letter: Character) {
+        let want = verse.hints[idx].lowercased()
+        if String(letter).lowercased() == want {
+            revealed.insert(idx)
+            let gen = UIImpactFeedbackGenerator(style: .light)
+            gen.impactOccurred()
+            advance()
+        } else {
+            mistakes.insert(idx)
+            revealed.insert(idx)
+            buzzError()
+            advance()
         }
-        revealAll = peeked.count == verse.words.count
+    }
+
+    private func advance() {
+        idx += 1
+        if done { entryFocused = false }
+    }
+
+    private func buzzError() {
+        AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+        UINotificationFeedbackGenerator().notificationOccurred(.error)
+    }
+
+    private func toggleForgiven(_ i: Int) {
+        if forgiven.contains(i) { forgiven.remove(i) } else { forgiven.insert(i) }
+        entryFocused = true
+    }
+
+    private func forgiveLatestMistake() {
+        // Shake forgives the most recent unforgiven mistake.
+        if let last = mistakes.subtracting(forgiven).sorted().last {
+            forgiven.insert(last)
+        }
+    }
+
+    private func reset() {
+        idx = 0
+        revealed = []
+        mistakes = []
+        forgiven = []
+        entry = ""
+        graded = nil
+        entryFocused = true
     }
 
     private func grade(_ g: Grade) {
-        store.grade(verse.id, grade: g, peeks: accidental ? 0 : peeked.count, accidental: accidental)
+        store.grade(verse.id, grade: g, mistakes: mistakeCount)
         graded = g
     }
 }

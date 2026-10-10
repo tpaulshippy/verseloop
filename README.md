@@ -9,12 +9,12 @@ Built as an alternative to Versify for that single workflow. It is deliberately 
 | Versify | VerseLoop |
 |---|---|
 | Game list + auto-scored taps | Single due-sorted **Loop**: one verse at a time |
-| A tap on the wrong word = penalty, no recourse | Taps only **peek** — they never grade. **Oops button + shake-to-undo** rewinds any tap |
+| Type mode with no per-error recourse | Wrong letter **buzzes + marks a red mistake** — tap any red word to forgive it as **accidental** |
 | No SM-2 from your feedback (per user report) | Every rep ends in an explicit **Again / Hard / Good / Easy** → real SM-2 ease + intervals |
-| "Taps were accidental" isn't a concept | An **accidental-taps toggle** zeroes peek influence on that grade |
+| Progress bar, no mistake accounting | No progress bar — a **mistake count** in the header, net of forgiven slips, plus a suggested grade |
 | Library stuck on-device | **JSON export/import + optional Worker sync code** — same code on two devices, push/pull |
 
-Tester: each word shows only its **first letter**; tap to peek, tap again to hide, Reveal-all, Oops-undo, then grade. Grades get an **8-second Undo** too.
+Tester: **type the first letter** of each word, one at a time. Right letter → the word appears; wrong letter → haptic buzz, the word appears red as a mistake, and you move on. Every mistake carries its own "accidental?" toggle (shake forgives the latest too). Finish the verse, see mistakes + a suggested grade, then grade. Grades get an **8-second Undo** too. Full dark-mode support throughout.
 
 ## ESV-only, legally
 
@@ -41,7 +41,7 @@ VerseLoop/            native iOS app (iOS 17+, iPhone SE3 supported)
   VerseStore.swift    queue, grading+undo, JSON persistence, export/import, sync
   ESVService.swift    Worker-proxy-first ESV fetch, direct fallback
   ContentView.swift   Loop / Verses / Add / Settings tabs
-  ReviewView.swift    first-letter tester + Oops + shake + grading
+  ReviewView.swift    type-the-first-letter tester + mistakes + per-word forgive + grading
 worker/               Cloudflare Worker (free tier): ESV proxy + sync store
 recordings/           simulator screen recordings (.mov) + screenshots
 ```
@@ -72,18 +72,18 @@ Endpoints: `GET /health` · `GET /v1/esv?q=John+1:1` · `PUT/GET /v1/sync/:code`
 
 ## Spaced repetition used
 
-SM-2-lite (Anki-style): Again resets (10-min retry, ease −0.20, lapse+1); Hard (ease −0.15, ×1.2); Good (1d → 3d → ×ease); Easy (ease +0.15, 4d start, ×ease×1.3). Ease floor 1.3. Due = end of day + interval. Only your explicit grade moves the schedule — peek counts are advisory and zeroable via the accidental flag.
+SM-2-lite (Anki-style): Again resets (10-min retry, ease −0.20, lapse+1); Hard (ease −0.15, ×1.2); Good (1d → 3d → ×ease); Easy (ease +0.15, 4d start, ×ease×1.3). Ease floor 1.3. Due = end of day + interval. Only your explicit grade moves the schedule — mistake counts are advisory, net of per-word accidental forgiveness.
 
 ## Evidence
 
-`recordings/` (all captured on **iPhone SE (3rd generation)** simulator, iOS 18.5):
-- `verseloop-se3.mov` (~7 MB) — full screen recording of the automated UI run below
+`recordings/` (all captured on **iPhone SE (3rd generation)** simulator, iOS 18.5, **dark mode**):
+- `verseloop-se3.mov` — full screen recording of the automated UI run below
 - `01-loop.png` — Today's Loop with Due/Total/Mastered + due-sorted queue
-- `02-review-first-letters.png` — first-letter grid, zero peeks
-- `03-review-peeked.png` — two words peeked, Oops enabled
-- `04-graded.png` — graded Good → next due tomorrow, Undo window
+- `02-review-mistake.png` — wrong first letter → red mistake word + "1 mistake"
+- `03-review-forgiven.png` — mistake forgiven as accidental → "0 mistakes"
+- `04-graded.png` — graded Good → next due date, Undo window
 - `05-settings.png` — ESV key, Worker sync, export/import
 - `06-add-verse.png` — Add verse with ESV fetch
 
-`VerseLoopUITests/testLoopFlow` drives the whole pass and **passes** (19.7s on SE3 sim):
-Loop → open verse → peek 2 words → Oops-undo (2→1 peeked) → accidental-toggle → Good → Undo grade → re-grade → Next → Settings → Add sheet.
+`VerseLoopUITests/testLoopFlow` drives the whole pass and **passes** on the SE3 sim:
+Loop → tap verse → tester appears → type wrong letter → "1 mistake" → forgive it → "0 mistakes" → type the rest → suggested grade → Good → Undo grade → re-grade → Next → Settings → Add sheet.

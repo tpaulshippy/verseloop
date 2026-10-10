@@ -82,16 +82,14 @@ final class VerseStore: ObservableObject {
         save()
     }
 
-    /// Explicit grade. `accidental=true` zeroes peek influence and is logged
-    /// with the grade so a stray tap never silently tanks the ease factor.
-    func grade(_ verseId: UUID, grade: Grade, peeks: Int, accidental: Bool) {
+    /// Explicit grade after a typing pass. `mistakes` is the mistake count
+    /// AFTER per-word accidental forgiveness, so stray keystrokes never
+    /// silently tank the ease factor.
+    func grade(_ verseId: UUID, grade: Grade, mistakes: Int) {
         let current = review(for: verseId)
         gradeUndoStack.append(GradeUndo(verseId: verseId, previous: current, grade: grade))
-        let effectivePeeks = accidental ? 0 : peeks
-        reviews[verseId] = current.advanced(with: grade, peeks: effectivePeeks)
-        undoToast = accidental
-            ? "Graded \(grade.title) · taps marked accidental — Undo"
-            : "Graded \(grade.title) — Undo"
+        reviews[verseId] = current.advanced(with: grade, mistakes: mistakes)
+        undoToast = "Graded \(grade.title) · \(mistakes) mistake\(mistakes == 1 ? "" : "s") — Undo"
         save()
     }
 

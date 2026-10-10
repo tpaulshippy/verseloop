@@ -68,20 +68,27 @@ struct ReviewState: Codable, Equatable {
     var due: Date
     var reps: Int
     var lapses: Int
-    var totalPeeks: Int
+    /// Assists used across reps (v1 "peeks", v2 mistakes). Advisory only —
+    /// only explicit grades move the schedule.
+    var totalHints: Int
     var lastGrade: Grade?
 
+    private enum CodingKeys: String, CodingKey {
+        case verseId, ease, intervalDays, due, reps, lapses, lastGrade
+        case totalHints = "totalPeeks" // v1 key kept so existing libraries still decode
+    }
+
     static func fresh(verseId: UUID, now: Date = Date()) -> ReviewState {
-        ReviewState(verseId: verseId, ease: 2.5, intervalDays: 0, due: now, reps: 0, lapses: 0, totalPeeks: 0, lastGrade: nil)
+        ReviewState(verseId: verseId, ease: 2.5, intervalDays: 0, due: now, reps: 0, lapses: 0, totalHints: 0, lastGrade: nil)
     }
 
     var isDue: Bool { due <= Date() }
 
-    /// Explicit grade -> next state. Taps/peeks never grade implicitly;
-    /// they are recorded separately and can be zeroed by the "accidental" flag.
-    func advanced(with grade: Grade, peeks: Int, now: Date = Date()) -> ReviewState {
+    /// Explicit grade -> next state. Typing mistakes never grade implicitly;
+    /// they are recorded separately, already net of per-word accidental forgiveness.
+    func advanced(with grade: Grade, mistakes: Int, now: Date = Date()) -> ReviewState {
         var r = self
-        r.totalPeeks += peeks
+        r.totalHints += mistakes
         r.lastGrade = grade
         switch grade {
         case .again:
