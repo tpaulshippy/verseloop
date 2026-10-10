@@ -1,5 +1,38 @@
 import Foundation
 import SwiftUI
+import CryptoKit
+
+/// Key + seal/open helpers. Pure functions so the crypto stays reviewable
+/// in one place and out of the UI/store logic.
+enum SyncCrypto {
+    private static let salt = Data("verseloop-sync-v1".utf8)
+    private static let info = Data("envelope".utf8)
+
+    static func key(fromCode code: String) -> SymmetricKey {
+        let material = SymmetricKey(data: Data(code.trimmingCharacters(in: .whitespacesAndNewlines).utf8))
+        return HKDF<SHA256>.deriveKey(
+            inputKeyMaterial: material,
+            salt: salt, info: info, outputByteCount: 32)
+    }
+
+    static func seal(_ envelope: LibraryEnvelope, code: String) throws -> EncryptedEnvelope {
+        let plain = try JSONEncoder().encode(envelope)
+        let box = try AES.GCM.seal(plain, using: key(fromCode: code))
+        return EncryptedEnvelope(version: 2, ciphertext: box.combined!.base64EncodedString(), updatedAt: Date())
+    }
+
+    static func open(_ env: EncryptedEnvelope, code: String) throws -> LibraryEnvelope {
+        guard let combined = Data(base64Encoded: env.ciphertext) else { throw CryptoError.encoding }
+        let box = try AES.GCM.SealedBox(combined: combined)
+        let plain = try AES.GCM.open(box, using: key(fromCode: code))
+        return try JSONDecoder().decode(LibraryEnvelope.self, from: plain)
+    }
+
+    enum CryptoError: LocalizedError {
+        case encoding
+        var errorDescription: String? { "Couldn't decode the encrypted snapshot." }
+    }
+}
 
 /// Single source of truth: verses + SM-2 reviews, JSON-persisted, exportable,
 /// and syncable through the free Cloudflare Worker (no Apple entitlements needed).
@@ -32,9 +65,30 @@ final class VerseStore: ObservableObject {
 
     init() {
         self.workerBaseURL = UserDefaults.standard.string(forKey: "verseloop.worker") ?? ""
-        self.syncCode = UserDefaults.standard.string(forKey: "verseloop.synccode") ?? ""
+        let storedCode = UserDefaults.standard.string(forKey: "verseloop.synccode") ?? ""
+        let code = storedCode.isEmpty ? Self.newSyncCode() : storedCode
+        self.syncCode = code
+        if storedCode.isEmpty { UserDefaults.standard.set(code, forKey: "verseloop.synccode") }
         self.esvAPIKey = UserDefaults.standard.string(forKey: "verseloop.esvkey") ?? ""
         if !load() { seedDemo() }
+    }
+
+    /// Random 128-bit code, grouped for transcription. Generated once;
+    /// the same code on both devices links them. It doubles as the
+    /// encryption password — treat it like one.
+    static func newSyncCode() -> String {
+        let hex = UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "")
+        var out = ""
+        for (i, ch) in hex.enumerated() {
+            if i > 0 && i % 4 == 0 { out += "-" }
+            out.append(ch)
+        }
+        return out
+    }
+
+    func regenerateSyncCode() {
+        syncCode = Self.newSyncCode() // didSet persists
+        syncMessage = "New code — push to overwrite the server snapshot, then paste on your other device."
     }
 
     // MARK: - Queue (the "Loop": one due-sorted pass per day)
@@ -171,13 +225,6 @@ final class VerseStore: ObservableObject {
 
     // MARK: - Worker sync (free tier; sync code is the only credential)
 
-    struct SyncPayload: Codable {
-        var version: Int
-        var verses: [Verse]
-        var reviews: [ReviewState]
-        var updatedAt: Date
-    }
-
     private func syncEndpoint(path: String) throws -> URL {
         let base = workerBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         let code = syncCode.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -207,12 +254,14 @@ final class VerseStore: ObservableObject {
             req.httpMethod = "PUT"
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.timeoutInterval = 15
-            let payload = SyncPayload(version: 1, verses: verses, reviews: Array(reviews.values), updatedAt: Date())
-            req.httpBody = try JSONEncoder().encode(payload)
+            let inner = LibraryEnvelope(version: 1, verses: verses, reviews: Array(reviews.values))
+            let code = syncCode.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !code.isEmpty else { throw SyncError.noCode }
+            req.httpBody = try JSONEncoder().encode(SyncCrypto.seal(inner, code: code))
             let (_, resp) = try await URLSession.shared.data(for: req)
             guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw SyncError.server("HTTP \((resp as? HTTPURLResponse)?.statusCode ?? -1)") }
             lastSyncAt = Date()
-            syncMessage = "Pushed \(verses.count) verses ✓"
+            syncMessage = "Pushed \(verses.count) verses, encrypted ✓"
         } catch {
             syncMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
@@ -225,17 +274,33 @@ final class VerseStore: ObservableObject {
             req.timeoutInterval = 15
             let (data, resp) = try await URLSession.shared.data(for: req)
             guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw SyncError.server("HTTP \((resp as? HTTPURLResponse)?.statusCode ?? -1)") }
-            let payload = try JSONDecoder().decode(SyncPayload.self, from: data)
-            var vById = Dictionary(uniqueKeysWithValues: verses.map { ($0.id, $0) })
-            for v in payload.verses { vById[v.id] = v }
-            verses = Array(vById.values).sorted { $0.addedAt < $1.addedAt }
-            for r in payload.reviews { reviews[r.verseId] = r }
+            let code = syncCode.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !code.isEmpty else { throw SyncError.noCode }
+            // v2 (encrypted) first, v1 plaintext as fallback for old snapshots.
+            if let enc = try? JSONDecoder().decode(EncryptedEnvelope.self, from: data),
+               enc.version == 2, !enc.ciphertext.isEmpty {
+                do {
+                    merge(try SyncCrypto.open(enc, code: code))
+                } catch {
+                    throw SyncError.server("wrong sync code or corrupt snapshot")
+                }
+            } else {
+                let env = try JSONDecoder().decode(LibraryEnvelope.self, from: data)
+                merge(env)
+            }
             lastSyncAt = Date()
-            syncMessage = "Pulled \(payload.verses.count) verses ✓"
+            syncMessage = "Pulled \(verses.count) verses ✓"
             save()
         } catch {
             syncMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
+    }
+
+    private func merge(_ env: LibraryEnvelope) {
+        var vById = Dictionary(uniqueKeysWithValues: verses.map { ($0.id, $0) })
+        for v in env.verses { vById[v.id] = v }
+        verses = Array(vById.values).sorted { $0.addedAt < $1.addedAt }
+        for r in env.reviews { reviews[r.verseId] = r }
     }
 
     func esvService() -> ESVService {

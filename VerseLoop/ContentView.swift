@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 extension Notification.Name {
@@ -237,8 +238,8 @@ struct SettingsView: View {
     @EnvironmentObject var store: VerseStore
     @State private var isImporting = false
     @State private var exportURL: URL?
-    @State private var isSharing = false
     @State private var isBusy = false
+    @State private var showingRegenConfirm = false
 
     var body: some View {
         NavigationStack {
@@ -247,11 +248,37 @@ struct SettingsView: View {
                     SecureField("ESV API key (api.esv.org)", text: $store.esvAPIKey)
                     Text("Not needed if your Worker holds the key server-side. Keys stay on-device.").font(.caption).foregroundStyle(.secondary)
                 }
-                Section("Sync (optional · free Cloudflare Worker)") {
+                Section("Sync (end-to-end encrypted · free Cloudflare Worker)") {
                     TextField("Worker URL — https://…workers.dev", text: $store.workerBaseURL)
                         .textInputAutocapitalization(.never).autocorrectionDisabled()
-                    TextField("Sync code — same on both devices", text: $store.syncCode)
-                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Sync code — made for you; same code on both devices")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text(store.syncCode.isEmpty ? "—" : store.syncCode)
+                            .font(.system(.callout, design: .monospaced))
+                            .textSelection(.enabled)
+                            .accessibilityIdentifier("sync-code")
+                        HStack {
+                            Button("Copy") {
+                                UIPasteboard.general.string = store.syncCode
+                                store.syncMessage = "Code copied — paste it on your other device."
+                            }
+                            Button("New code", role: .destructive) { showingRegenConfirm = true }
+                                .confirmationDialog(
+                                    "New sync code?",
+                                    isPresented: $showingRegenConfirm,
+                                    titleVisibility: .visible
+                                ) {
+                                    Button("Generate new code", role: .destructive) {
+                                        store.regenerateSyncCode()
+                                    }
+                                } message: {
+                                    Text("The old code's server snapshot becomes unreachable. Push after regenerating to store under the new code.")
+                                }
+                        }
+                    }
+                    Text("Locked with a key derived from this code (AES-GCM). The server only ever sees ciphertext.")
+                        .font(.caption).foregroundStyle(.secondary)
                     HStack {
                         Button { Task { isBusy = true; await store.push(); isBusy = false } } label: { Text("Push") }.disabled(isBusy)
                         Button { Task { isBusy = true; await store.pull(); isBusy = false } } label: { Text("Pull") }.disabled(isBusy)

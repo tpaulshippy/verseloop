@@ -1,6 +1,9 @@
 // VerseLoop Worker — free-tier Cloudflare Worker.
 // Two jobs: (1) ESV passage proxy w/ cache (keeps API key server-side),
 // (2) tiny sync store for library JSON (KV when bound, memory otherwise).
+// Sync payloads are end-to-end encrypted by the app (AES-GCM, key derived
+// from the user's sync code): this worker only ever sees opaque v2
+// ciphertext and cannot read verses, reviews, or schedules.
 //
 // Free-tier notes: Cache API + subrequests are free. KV is optional —
 // if no KV binding exists we fall back to in-memory (single isolate).
@@ -78,10 +81,16 @@ async function handleSync(request, env, code) {
   if (request.method === "PUT") {
     const body = await request.text();
     if (body.length > 256 * 1024) return json({ error: "payload > 256KB" }, 413);
-    // Validate envelope shape lightly.
+    // Validate envelope shape lightly. v2 is opaque ciphertext (end-to-end
+    // encrypted); the server never sees verses. v1 plaintext still accepted
+    // for old snapshots.
     try {
       const p = JSON.parse(body);
-      if (!Array.isArray(p.verses) || !Array.isArray(p.reviews)) {
+      if (p.version === 2) {
+        if (typeof p.ciphertext !== "string" || p.ciphertext.length === 0) {
+          return json({ error: "bad v2 envelope" }, 400);
+        }
+      } else if (!Array.isArray(p.verses) || !Array.isArray(p.reviews)) {
         return json({ error: "bad envelope" }, 400);
       }
     } catch {

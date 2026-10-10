@@ -78,7 +78,7 @@ npx wrangler secret put ESV_API_TOKEN   # your api.esv.org key
 npm run deploy                          # -> https://verseloop.<you>.workers.dev
 ```
 
-Paste that URL into the app's **Settings → Worker URL**. Pick any sync code (e.g. `psalm-morning-7`), use the same code on your second device, Push on one / Pull on the other. No KV binding needed to start (in-memory); add the `SYNC_KV` binding in `wrangler.toml` for durable multi-device sync — still free tier.
+Paste that URL into the app's **Settings → Worker URL**. Your sync code is generated automatically on first launch — **Copy** it there and paste it on your second device (Universal Clipboard works across your devices). Push on one / Pull on the other. Libraries are end-to-end encrypted (AES-GCM, key derived from the code via HKDF-SHA256), so the Worker only ever stores ciphertext it cannot read. "New code" regenerates (old snapshots become unreachable). No KV binding needed to start (in-memory); add the `SYNC_KV` binding in `wrangler.toml` for durable multi-device sync — still free tier.
 
 Endpoints: `GET /health` · `GET /v1/esv?q=John+1:1` · `PUT/GET /v1/sync/:code` (256 KB cap).
 

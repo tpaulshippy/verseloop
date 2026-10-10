@@ -132,3 +132,18 @@ struct LibraryEnvelope: Codable {
     var verses: [Verse]
     var reviews: [ReviewState]
 }
+
+// MARK: - Encrypted sync envelope (v2, end-to-end encrypted)
+//
+// The sync code the user sees IS the password: a 256-bit key is derived
+// from it with HKDF-SHA256, and the library JSON is sealed with AES-GCM.
+// The server (Cloudflare Worker, or anyone holding a snapshot) only ever
+// sees `ciphertext` and cannot read verses, reviews, or schedule state.
+// Forgiving a mistake or grading never touches this layer — it only
+// changes what gets encrypted next push.
+
+struct EncryptedEnvelope: Codable {
+    var version: Int // always 2
+    var ciphertext: String // base64 AES-GCM combined (nonce + ct + tag)
+    var updatedAt: Date
+}
