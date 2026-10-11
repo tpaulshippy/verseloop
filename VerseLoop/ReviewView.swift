@@ -96,12 +96,15 @@ struct ReviewView: View {
     private var refStarted: Bool { revealed.contains(where: { $0 >= words.count }) }
     private var mistakeCount: Int { mistakes.subtracting(forgiven).count }
     private var mistakeText: String { mistakeCount == 1 ? "1 mistake" : "\(mistakeCount) mistakes" }
-    /// Suggestion bands: clean passes earn Easy; a couple of slips is Good;
-    /// real struggle is Hard; six or more mistakes means it didn't stick.
+    /// Suggestion bands are a rate, not a raw count, so long passages
+    /// aren't punished for absolute slips: 0% Easy, ≤10% Good, ≤25% Hard,
+    /// above that Again. Net of forgiven mistakes.
     private var suggested: String {
+        let total = max(1, words.count + refExpected.count)
+        let rate = Double(mistakeCount) / Double(total)
         if mistakeCount == 0 { return "Easy" }
-        if mistakeCount <= 2 { return "Good" }
-        if mistakeCount <= 5 { return "Hard" }
+        if rate <= 0.10 { return "Good" }
+        if rate <= 0.25 { return "Hard" }
         return "Again"
     }
 
