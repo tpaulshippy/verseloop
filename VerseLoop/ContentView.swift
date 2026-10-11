@@ -237,6 +237,8 @@ struct AddVerseView: View {
 struct SettingsView: View {
     @EnvironmentObject var store: VerseStore
     @State private var isImporting = false
+    @State private var isPasting = false
+    @State private var pastedJSON = ""
     @State private var exportURL: URL?
     @State private var isBusy = false
 
@@ -261,6 +263,7 @@ struct SettingsView: View {
                         }
                     }
                     Button("Import JSON…") { isImporting = true }
+                    Button("Import pasted JSON…") { pastedJSON = ""; isPasting = true }
                 }
                 Section("About") {
                     Text("VerseLoop · ESV-only memorization with real SM-2 spaced repetition, forgiving first-letter testing, and exportable sync.").font(.caption)
@@ -276,6 +279,37 @@ struct SettingsView: View {
                     store.syncMessage = "Imported ✓"
                 } catch {
                     store.syncMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                }
+            }
+            .sheet(isPresented: $isPasting) {
+                NavigationStack {
+                    Form {
+                        Section {
+                            TextEditor(text: $pastedJSON)
+                                .frame(minHeight: 220)
+                                .font(.system(.callout, design: .monospaced))
+                                .autocorrectionDisabled()
+                                .textInputAutocapitalization(.never)
+                        } footer: {
+                            Text("Paste a VerseLoop JSON export (same format as the export file).")
+                        }
+                        Section {
+                            Button("Import") {
+                                do {
+                                    guard let data = pastedJSON.data(using: .utf8), !data.isEmpty else { return }
+                                    try store.importJSON(data)
+                                    store.syncMessage = "Imported ✓"
+                                    isPasting = false
+                                } catch {
+                                    store.syncMessage = "Import failed — not a VerseLoop export."
+                                }
+                            }
+                            .disabled(pastedJSON.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+                    }
+                    .navigationTitle("Import pasted JSON")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { Button("Cancel") { isPasting = false } }
                 }
             }
         }

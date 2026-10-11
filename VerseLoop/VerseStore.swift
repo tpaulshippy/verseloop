@@ -199,13 +199,14 @@ final class VerseStore: ObservableObject {
     func importFrom(url: URL) throws {
         _ = url.startAccessingSecurityScopedResource()
         defer { url.stopAccessingSecurityScopedResource() }
-        let data = try Data(contentsOf: url)
+        try importJSON(try Data(contentsOf: url))
+    }
+
+    /// Import from pasted text (Settings → Import from pasted JSON).
+    /// Same merge rule as file import: imported records win by id.
+    func importJSON(_ data: Data) throws {
         let env = try JSONDecoder().decode(LibraryEnvelope.self, from: data)
-        // Merge by id: imported wins.
-        var vById = Dictionary(uniqueKeysWithValues: verses.map { ($0.id, $0) })
-        for v in env.verses { vById[v.id] = v }
-        verses = Array(vById.values).sorted { $0.addedAt < $1.addedAt }
-        for r in env.reviews { reviews[r.verseId] = r }
+        merge(env)
         save()
     }
 
