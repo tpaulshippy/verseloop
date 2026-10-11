@@ -117,24 +117,27 @@ struct ReviewView: View {
     private func isMistake(_ i: Int) -> Bool { mistakes.contains(i) && !forgiven.contains(i) }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                hiddenField
-                passage
-                if refStarted { referenceRow }
-                if !done {
-                    controls
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    header
+                    hiddenField
+                    passage
+                    if refStarted { referenceRow }
+                    if !done {
+                        controls
+                    }
+                    if graded == nil {
+                        if done { gradeBlock.id("grade") }
+                    } else {
+                        gradedBlock
+                    }
                 }
-                if graded == nil {
-                    if done { gradeBlock }
-                } else {
-                    gradedBlock
-                }
+                .padding()
+                .contentShape(Rectangle())
+                .onTapGesture { entryFocused = true }
             }
-            .padding()
-            .contentShape(Rectangle())
-            .onTapGesture { entryFocused = true }
+            .onChange(of: idx) { _, _ in followTyping(proxy) }
         }
         .navigationTitle("Type")
         .navigationBarTitleDisplayMode(.inline)
@@ -165,6 +168,7 @@ struct ReviewView: View {
             ForEach(Array(words.enumerated()), id: \.offset) { i, word in
                 if revealed.contains(i) {
                     mistakeChip(label: word, index: i)
+                        .id(i)
                 }
             }
         }
@@ -196,12 +200,14 @@ struct ReviewView: View {
         return HStack(alignment: .top, spacing: 0) {
             if revealed.contains(bookSlot) {
                 mistakeChip(label: p.book, index: bookSlot)
+                    .id(bookSlot)
                 Text(" ").font(.title3)
             }
-            ForEach(Array(tailSlots.enumerated()), id: \.offset) { k, slot in
+                    ForEach(Array(tailSlots.enumerated()), id: \.offset) { k, slot in
                 if let s = slot.stream {
                     if revealed.contains(s) {
                         mistakeChip(label: String(slot.char), index: s, refTag: s)
+                            .id(s)
                     }
                 } else if tailStaticVisible(k) {
                     Text(String(slot.char)).font(.title3).foregroundStyle(.secondary)
@@ -396,6 +402,17 @@ struct ReviewView: View {
     private func advance() {
         idx += 1
         if done { entryFocused = false }
+    }
+
+    /// Follows the typing: newest revealed item rides just above the
+    /// keyboard; the grade card scrolls into view when the pass completes.
+    /// Short verses never scroll — these are no-ops there.
+    private func followTyping(_ proxy: ScrollViewProxy) {
+        if done {
+            withAnimation { proxy.scrollTo("grade", anchor: .top) }
+        } else if idx > 0 {
+            withAnimation { proxy.scrollTo(idx - 1, anchor: .bottom) }
+        }
     }
 
     private func buzzError() {

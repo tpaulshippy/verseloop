@@ -29,6 +29,18 @@ struct VerseLoopApp: App {
                     ))
                 }
                 .environmentObject(store)
+            } else if CommandLine.arguments.contains("-UITestLong") {
+                // Long-passage hook (public-domain KJV): Psalm 23:1-4.
+                // Exercises auto-scroll follow on verses that overflow.
+                NavigationStack {
+                    ReviewView(verse: Verse(
+                        id: UUID(uuidString: "00000000-0000-0000-0000-000000000003")!,
+                        reference: "Psalm 23:1-4 (demo · KJV)",
+                        text: "The LORD is my shepherd; I shall not want. He maketh me to lie down in green pastures: he leadeth me beside the still waters. He restoreth my soul: he leadeth me in the paths of righteousness for his name's sake. Yea, though I walk through the valley of the shadow of death, I will fear no evil: for thou art with me; thy rod and thy staff they comfort me.",
+                        textSource: "kjv-demo"
+                    ))
+                }
+                .environmentObject(store)
             } else {
                 ContentView()
                     .environmentObject(store)

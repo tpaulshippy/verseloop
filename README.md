@@ -97,7 +97,9 @@ SM-2-lite (Anki-style): Again resets (10-min retry, ease −0.20, lapse+1); Hard
 - `05-settings.png` — sync, export/import, about
 - `06-add-verse.png` — Add verse with ESV fetch (ranges like `Psalm 23:1-6` accepted)
 - `07-range-ref.png` — multi-verse range composed inline with colon + dash
+- `08-long-scroll.png` — 71-word passage auto-followed to the grade card
 
-`VerseLoopUITests` drives both passes and **passes** on the SE3 sim:
+`VerseLoopUITests` drives all passes and **passes** on the SE3 sim:
 `testLoopFlow`: Loop → tap verse → tester appears → type wrong letter → "1 mistake" → forgive it → "0 mistakes" → type the rest → reference `P231` → suggested grade → Good → Undo grade → re-grade → Next → Settings → Add sheet.
 `testRangeFlow`: Psalm 23:1-2 straight through (25 initials + `P2312`) → composed reference → grade.
+`testLongFlow`: Psalm 23:1-4 (71 words + `P2314`) with auto-scroll follow → ends at the grade card → grade.

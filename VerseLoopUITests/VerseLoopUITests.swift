@@ -110,4 +110,23 @@ final class VerseLoopUITests: XCTestCase {
         app.buttons["Good"].tap()
         XCTAssertTrue(app.buttons["Next →"].waitForExistence(timeout: 5))
     }
+
+    /// Long passage: Psalm 23:1-4 (71 words) types straight through while
+    /// the view follows; ends scrolled at the grade card.
+    func testLongFlow() throws {
+        let app = XCUIApplication(bundleIdentifier: bundleID)
+        app.launchArguments = ["-UITestLong"]
+        app.launch()
+        let field = app.textFields["first-letter-input"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        app.staticTexts["mistake-count"].tap()
+        field.typeText("tlimsisnwhmmtldigphlmbtswhrmshlmitporfhnsytiwttvotsodiwfneftawmtratstcm")
+        XCTAssertTrue(app.buttons["Show character"].waitForExistence(timeout: 10))
+        app.staticTexts["mistake-count"].tap()
+        field.typeText("P2314")
+        XCTAssertTrue(app.staticTexts["Suggested: Easy — but your grade decides, as always."].waitForExistence(timeout: 10))
+        snap(app, "08-long-scroll")
+        app.buttons["Good"].tap()
+        XCTAssertTrue(app.buttons["Next →"].waitForExistence(timeout: 5))
+    }
 }

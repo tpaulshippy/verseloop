@@ -112,7 +112,6 @@ struct VerseRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(verse.reference).font(.headline)
-            Text(verseLinePreview).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
             HStack(spacing: 8) {
                 DueBadge(review: review)
                 Text("E\(String(format: "%.2f", review.ease)) · ×\(review.reps)").font(.caption2).foregroundStyle(.secondary)
@@ -121,10 +120,6 @@ struct VerseRow: View {
                 }
             }
         }.padding(.vertical, 4)
-    }
-    private var verseLinePreview: String {
-        let w = verse.words.prefix(12).joined(separator: " ")
-        return verse.words.count > 12 ? w + "…" : w
     }
 }
 
