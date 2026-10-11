@@ -35,6 +35,38 @@ enum SyncCrypto {
     }
 }
 
+/// Routes reminder taps to the practice screen. UNUserNotificationCenter
+/// needs an NSObject delegate; it calls back with the tapped request, we
+/// extract the verse id and hand it to the store, which LoopTab consumes
+/// into its navigation path.
+final class ReminderRouter: NSObject, UNUserNotificationCenterDelegate {
+    static let verseKey = "verseId"
+    static let duePrefix = "verseloop.reminder.due-"
+
+    var onOpenVerse: ((UUID) -> Void)?
+
+    /// Verse id from a tapped request: userInfo first, falling back to the
+    /// request identifier for requests scheduled before userInfo was added.
+    static func verseId(userInfo: [AnyHashable: Any], identifier: String) -> UUID? {
+        let raw: String? = (userInfo[verseKey] as? String)
+            ?? (identifier.hasPrefix(duePrefix)
+                ? String(identifier.dropFirst(duePrefix.count)) : nil)
+        return raw.flatMap(UUID.init(uuidString:))
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        defer { completionHandler() }
+        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier else { return }
+        let request = response.notification.request
+        guard let id = Self.verseId(userInfo: request.content.userInfo,
+                                    identifier: request.identifier) else { return }
+        let handler = onOpenVerse
+        Task { @MainActor in handler?(id) }
+    }
+}
+
 /// Single source of truth: verses + SM-2 reviews, JSON-persisted, exportable,
 /// and syncable through the free Cloudflare Worker (no Apple entitlements needed).
 @MainActor
@@ -120,6 +152,10 @@ final class VerseStore: ObservableObject {
     }
     /// Non-empty when reminders are on but blocked (e.g. denied in Settings).
     @Published var reminderStatus: String = ""
+    /// Verse to open for practice from a tapped due-reminder. Session-only
+    /// (never persisted): set by ReminderRouter, consumed by LoopTab.
+    @Published var pendingPracticeVerseId: UUID?
+    private let reminderRouter = ReminderRouter()
 
     // Settings (UserDefaults so they survive reinstalls of dev builds).
     // The Worker URL is fixed (your own deployment); the ESV key lives
@@ -171,8 +207,19 @@ final class VerseStore: ObservableObject {
         if let t = UserDefaults.standard.object(forKey: "verseloop.dailyReminderDate") as? Date {
             self.dailyReminderDate = t
         }
+        // Taps on due-reminders deep-link into practice (LoopTab consumes).
+        reminderRouter.onOpenVerse = { [weak self] id in self?.pendingPracticeVerseId = id }
+        UNUserNotificationCenter.current().delegate = reminderRouter
         // Pending requests survive restarts, but dues shift — rebuild once.
         refreshReminders()
+    }
+
+    /// Returns the tapped-reminder verse (clearing the request), or nil when
+    /// there is none or the verse is gone (deleted after scheduling).
+    func takePendingPracticeVerse() -> Verse? {
+        guard let id = pendingPracticeVerseId else { return nil }
+        pendingPracticeVerseId = nil
+        return verses.first { $0.id == id }
     }
 
     /// Random 128-bit code, grouped for transcription. Generated once;
@@ -353,6 +400,7 @@ final class VerseStore: ObservableObject {
                 let content = UNMutableNotificationContent()
                 content.title = "Verse due"
                 content.body = "\(v.reference) is ready to review."
+                content.userInfo = [ReminderRouter.verseKey: v.id.uuidString]
                 let trigger = UNTimeIntervalNotificationTrigger(
                     timeInterval: max(1, due.timeIntervalSince(now)), repeats: false)
                 try? await center.add(UNNotificationRequest(

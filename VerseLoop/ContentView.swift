@@ -89,7 +89,18 @@ struct LoopTab: View {
                     onDone: { path = NavigationPath() }
                 )
             }
+            // A tapped due-reminder jumps straight into that verse — warm
+            // (onChange) and cold start (.task on first appear) alike.
+            .onChange(of: store.pendingPracticeVerseId) { _, _ in openPendingReminder() }
+            .task { openPendingReminder() }
         }
+    }
+
+    /// Opens the tapped-reminder verse for practice immediately.
+    private func openPendingReminder() {
+        guard let verse = store.takePendingPracticeVerse() else { return }
+        path = NavigationPath()
+        path.append(verse)
     }
 
     private func header(now: Date) -> some View {
@@ -331,7 +342,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Reminders")
                 } footer: {
-                    Text("“When verses become due” notifies as each verse's retry window arrives. “Daily” sends one reminder at your chosen time.")
+                    Text("“When verses become due” notifies as each verse's retry window arrives — tap it to jump straight into that verse. “Daily” sends one reminder at your chosen time.")
                 }
                 .onChange(of: store.remindersEnabled) { _, on in
                     Task {
