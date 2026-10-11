@@ -78,7 +78,7 @@ npx wrangler secret put ESV_API_TOKEN   # your api.esv.org key
 npm run deploy                          # -> https://verseloop.<you>.workers.dev
 ```
 
-The app points at your Worker URL (baked in at build time) and generates its own sync code on first launch — nothing to configure on-device. Sync is deliberately single-device: the code is never shown, so each install has its own encrypted bucket, and Push/Pull acts as encrypted backup for that device. To move data between devices, use Settings → JSON export/import. Libraries are end-to-end encrypted (AES-GCM, key derived from the code via HKDF-SHA256), so the Worker only ever stores ciphertext it cannot read. No KV binding needed to start (in-memory); add the `SYNC_KV` binding in `wrangler.toml` for durable snapshots — still free tier.
+The app points at the Worker URL (baked in at build time) and generates its own sync code on first launch — nothing to configure on-device. Sync is deliberately single-device: the code is never shown, so each install has its own encrypted bucket, and Push/Pull acts as encrypted backup for that device. To move data between devices, use Settings → JSON export/import. Libraries are end-to-end encrypted (AES-GCM, key derived from the code via HKDF-SHA256), so the Worker only ever stores ciphertext it cannot read. No KV binding needed to start (in-memory); add the `SYNC_KV` binding in `wrangler.toml` for durable snapshots — still free tier.
 
 Endpoints: `GET /health` · `GET /v1/esv?q=John+1:1` · `PUT/GET /v1/sync/:code` (256 KB cap).
 
