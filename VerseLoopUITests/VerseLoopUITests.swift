@@ -27,7 +27,7 @@ final class VerseLoopUITests: XCTestCase {
         // ---- Launch 1: real navigation Loop -> Review ----
         var app = XCUIApplication(bundleIdentifier: bundleID)
         app.launch()
-        XCTAssertTrue(app.staticTexts["Today's Loop"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["Today's Verses"].waitForExistence(timeout: 15))
         snap(app, "01-loop")
         let verseCell = app.staticTexts["Psalm 23:1 (demo · KJV)"]
         XCTAssertTrue(verseCell.waitForExistence(timeout: 10))
@@ -104,8 +104,8 @@ final class VerseLoopUITests: XCTestCase {
         app.staticTexts["mistake-count"].tap()
         field.typeText("P2312")
         XCTAssertTrue(app.staticTexts["Suggested: Easy — but your grade decides, as always."].waitForExistence(timeout: 10))
-        // The book chip is a (disabled) button carrying its label.
-        XCTAssertTrue(app.buttons["Psalm"].waitForExistence(timeout: 5))
+        // The book renders as a plain (white) view when never mistaken.
+        XCTAssertTrue(app.staticTexts["Psalm"].waitForExistence(timeout: 5))
         snap(app, "07-range-ref")
         app.buttons["Good"].tap()
         XCTAssertTrue(app.buttons["Next →"].waitForExistence(timeout: 5))

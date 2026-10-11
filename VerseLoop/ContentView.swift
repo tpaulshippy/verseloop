@@ -30,7 +30,7 @@ struct ContentView: View {
     var body: some View {
         TabView {
             LoopTab()
-                .tabItem { Label("Loop", systemImage: "repeat.circle.fill") }
+                .tabItem { Label("Today", systemImage: "repeat.circle.fill") }
             VersesTab()
                 .tabItem { Label("Verses", systemImage: "books.vertical.fill") }
             SettingsView()
@@ -65,7 +65,7 @@ struct LoopTab: View {
                     .listStyle(.plain)
                 }
             }
-            .navigationTitle("Today's Loop")
+            .navigationTitle("Today's Verses")
         }
     }
 

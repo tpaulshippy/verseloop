@@ -90,7 +90,7 @@ SM-2-lite (Anki-style): Again resets (10-min retry, ease −0.20, lapse+1); Hard
 
 `recordings/` (all captured on **iPhone SE (3rd generation)** simulator, iOS 18.5, **dark mode**):
 - `verseloop-se3.mov` — full screen recording of the automated UI run below
-- `01-loop.png` — Today's Loop with Due/Total/Mastered + due-sorted queue
+- `01-loop.png` — Today's Verses with Due/Total/Mastered + due-sorted queue
 - `02-review-mistake.png` — wrong first letter → red mistake word + "1 mistake"
 - `03-review-forgiven.png` — mistake forgiven as accidental → "0 mistakes"
 - `04-graded.png` — graded Good → next due date, Undo window

@@ -96,10 +96,13 @@ struct ReviewView: View {
     private var refStarted: Bool { revealed.contains(where: { $0 >= words.count }) }
     private var mistakeCount: Int { mistakes.subtracting(forgiven).count }
     private var mistakeText: String { mistakeCount == 1 ? "1 mistake" : "\(mistakeCount) mistakes" }
+    /// Suggestion bands: clean passes earn Easy; a couple of slips is Good;
+    /// real struggle is Hard; six or more mistakes means it didn't stick.
     private var suggested: String {
         if mistakeCount == 0 { return "Easy" }
         if mistakeCount <= 2 { return "Good" }
-        return "Hard"
+        if mistakeCount <= 5 { return "Hard" }
+        return "Again"
     }
 
     /// Stream index -> expected input character.
@@ -227,28 +230,34 @@ struct ReviewView: View {
     }
 
     /// A revealed item: full color normally, red with an "accidental?"
-    /// affordance while it's an unforgiven mistake. Forgiven items render
-    /// plain (tap again to unmark).
+    /// affordance while it's an unforgiven mistake. Display-only items are
+    /// plain views (never disabled buttons — SwiftUI dims those, which is
+    /// why untouched words looked gray next to bright ones).
+    @ViewBuilder
     private func mistakeChip(label: String, index i: Int, refTag: Int? = nil) -> some View {
-        let bad = isMistake(i)
-        let wasBad = mistakes.contains(i)
-        return Button {
-            if wasBad { toggleForgiven(i) }
-        } label: {
-            VStack(spacing: 0) {
-                Text(label)
-                    .font(.title3)
-                    .foregroundStyle(bad ? Color.red : Color.primary)
-                if bad {
-                    Text("accidental?").font(.caption2).foregroundStyle(.secondary)
-                }
+        if mistakes.contains(i) {
+            Button { toggleForgiven(i) } label: {
+                chipContent(label: label, index: i)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isMistake(i)
+                ? (refTag == nil ? "Mark accidental: \(label)" : "Mark accidental ref \(refTag!)")
+                : "Accidental, tap to unmark")
+        } else {
+            chipContent(label: label, index: i)
+                .accessibilityLabel(label)
+        }
+    }
+
+    private func chipContent(label: String, index i: Int) -> some View {
+        VStack(spacing: 0) {
+            Text(label)
+                .font(.title3)
+                .foregroundStyle(isMistake(i) ? Color.red : Color.primary)
+            if isMistake(i) {
+                Text("accidental?").font(.caption2).foregroundStyle(.secondary)
             }
         }
-        .buttonStyle(.plain)
-        .disabled(!wasBad)
-        .accessibilityLabel(bad
-            ? (refTag == nil ? "Mark accidental: \(label)" : "Mark accidental ref \(refTag!)")
-            : (mistakes.contains(i) ? "Accidental, tap to unmark" : label))
     }
 
     // MARK: input — invisible capture field; the keyboard is the UI.
@@ -297,8 +306,6 @@ struct ReviewView: View {
 
     private var gradeBlock: some View {
         VStack(spacing: 10) {
-            Text(verse.reference).font(.title3).bold()
-                .frame(maxWidth: .infinity, alignment: .leading)
             HStack {
                 Image(systemName: mistakeCount == 0 ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                     .foregroundStyle(mistakeCount == 0 ? .green : .orange)
