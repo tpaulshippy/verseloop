@@ -131,10 +131,22 @@ struct DueBadge: View {
                 .background(Color.orange.opacity(0.2), in: Capsule())
                 .foregroundStyle(.orange)
         } else {
-            Text("in \(review.intervalDays)d").font(.caption2).padding(.horizontal, 8).padding(.vertical, 3)
+            Text(dueText(review)).font(.caption2).padding(.horizontal, 8).padding(.vertical, 3)
                 .background(Color.secondary.opacity(0.15), in: Capsule())
                 .foregroundStyle(.secondary)
         }
+    }
+
+    /// Honest relative label. Never "in 0d": a retry minutes away says so.
+    private func dueText(_ r: ReviewState) -> String {
+        let mins = Int(r.due.timeIntervalSinceNow / 60)
+        if mins < 1 { return "moments" }
+        if mins < 60 { return "in \(mins) min" }
+        let cal = Calendar.current
+        if cal.isDateInTomorrow(r.due) { return "tomorrow" }
+        let days = cal.dateComponents([.day], from: cal.startOfDay(for: Date()), to: cal.startOfDay(for: r.due)).day ?? r.intervalDays
+        if days < 1 { return "in \(mins / 60)h" }
+        return "in \(days)d"
     }
 }
 
