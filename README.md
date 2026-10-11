@@ -18,7 +18,7 @@ Tester: the reference stays **hidden** and no word counts are shown. **Type the 
 
 ## ESV-only, legally
 
-**Only the English Standard Version.** ESV text is © Crossway and is **never bundled in this repo** — not in code, seeds, tests, or recordings fixtures. The app ships with two short public-domain KJV demo verses so the simulator build works offline; real ESV passages are fetched at runtime through your own Worker, which holds the free api.esv.org key server-side (set once as `ESV_API_TOKEN`, auto-deployed by CI). No key ever lives on-device.
+**Only the English Standard Version.** ESV text is © Crossway and is **never bundled in this repo** — not in code, seeds, tests, or recordings fixtures. The app ships with two short public-domain KJV demo verses so the simulator build works offline; real ESV passages are fetched at runtime through the built-in secure service, which holds the free api.esv.org key server-side (set once as `ESV_API_TOKEN`, auto-deployed by CI). No key ever lives on-device.
 
 1. Get a free key at https://api.esv.org (an "API Application").
 2. Set it once as the `ESV_API_TOKEN` repo secret (Settings → Secrets and variables → Actions). The deploy workflow puts it server-side on every deploy. The Worker caches passages 24h (free Cache API) to stay inside ESV quotas.
@@ -66,7 +66,7 @@ Prereqs: paid Apple Developer membership + the app's bundle ID (`com.tpaulshippy
 2. **Archive**: in Xcode set the VerseLoop target's team, then Product → Archive (Release). Or run `./scripts/archive-testflight.sh` after putting your Team ID in `scripts/ExportOptions.plist`.
 3. **Distribute**: Organizer → Distribute App → TestFlight & App Store → upload. Wait for processing (~10–60 min; you'll get an email).
 4. **Testers**: App Store Connect → your app → TestFlight → add yourself as an **internal tester** (no beta review needed). Install Apple's **TestFlight** app on the SE3, accept the invite.
-5. **First launch on device**: just add verses (ESV fetches through your Worker; the two KJV demo verses work with zero setup).
+5. **First launch on device**: just add verses (ESV fetches automatically; the two KJV demo verses work with zero setup).
 
 Every re-upload needs a new build number: bump `CURRENT_PROJECT_VERSION` in the project (1 → 2 → 3…). External testers (other people) require passing Beta App Review first — internal testing does not.
 
