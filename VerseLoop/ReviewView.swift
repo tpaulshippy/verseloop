@@ -101,14 +101,15 @@ struct ReviewView: View {
     private var mistakeCount: Int { mistakes.subtracting(forgiven).count }
     private var mistakeText: String { mistakeCount == 1 ? "1 mistake" : "\(mistakeCount) mistakes" }
     /// Suggestion bands are a rate, not a raw count, so long passages
-    /// aren't punished for absolute slips: 0% Easy, ≤5% Good, ≤15% Hard,
-    /// above that Again. Net of forgiven mistakes.
+    /// aren't punished for absolute slips. Thresholds live in Settings
+    /// (defaults 0% Easy, ≤5% Good, ≤15% Hard, above that Again),
+    /// net of forgiven mistakes.
     private var suggested: String {
         let total = max(1, words.count + refExpected.count)
         let rate = Double(mistakeCount) / Double(total)
         if mistakeCount == 0 { return "Easy" }
-        if rate <= 0.05 { return "Good" }
-        if rate <= 0.15 { return "Hard" }
+        if rate <= store.goodThreshold { return "Good" }
+        if rate <= store.hardThreshold { return "Hard" }
         return "Again"
     }
 

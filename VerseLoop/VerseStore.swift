@@ -53,6 +53,31 @@ final class VerseStore: ObservableObject {
     }
     private var autoSyncTask: Task<Void, Never>?
 
+    // Suggestion bands (mistake rate net of forgiven): 0 slips -> Easy,
+    // rate <= goodThreshold -> Good, <= hardThreshold -> Hard, else Again.
+    // Configurable in Settings; enforced good <= hard.
+    @Published var goodThreshold: Double = 0.05 {
+        didSet {
+            goodThreshold = min(max(goodThreshold, 0), 0.5)
+            if goodThreshold > hardThreshold { hardThreshold = goodThreshold }
+            UserDefaults.standard.set(goodThreshold, forKey: "verseloop.goodThreshold")
+        }
+    }
+    @Published var hardThreshold: Double = 0.15 {
+        didSet {
+            hardThreshold = min(max(hardThreshold, 0), 0.5)
+            if hardThreshold < goodThreshold { goodThreshold = hardThreshold }
+            UserDefaults.standard.set(hardThreshold, forKey: "verseloop.hardThreshold")
+        }
+    }
+
+    func resetSuggestionThresholds() {
+        goodThreshold = Self.defaultGoodThreshold
+        hardThreshold = Self.defaultHardThreshold
+    }
+    static let defaultGoodThreshold = 0.05
+    static let defaultHardThreshold = 0.15
+
     // Settings (UserDefaults so they survive reinstalls of dev builds).
     // The Worker URL is fixed (your own deployment); the ESV key lives
     // server-side only, so neither is user-visible anymore.
@@ -90,6 +115,11 @@ final class VerseStore: ObservableObject {
             self.autoSyncEnabled = UserDefaults.standard.bool(forKey: "verseloop.autosync")
         }
         if !load() { seedDemo() }
+        let good = UserDefaults.standard.object(forKey: "verseloop.goodThreshold") as? Double
+        let hard = UserDefaults.standard.object(forKey: "verseloop.hardThreshold") as? Double
+        self.goodThreshold = good ?? Self.defaultGoodThreshold
+        self.hardThreshold = hard ?? Self.defaultHardThreshold
+        if self.hardThreshold < self.goodThreshold { self.hardThreshold = self.goodThreshold }
     }
 
     /// Random 128-bit code, grouped for transcription. Generated once;

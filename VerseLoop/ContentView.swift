@@ -301,6 +301,17 @@ struct SettingsView: View {
                     if !store.syncMessage.isEmpty { Text(store.syncMessage).font(.caption).foregroundStyle(.secondary) }
                     if let d = store.lastSyncAt { Text("Last sync: \(d.formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(.secondary) }
                 }
+                Section {
+                    Stepper("Good up to \(Int((store.goodThreshold * 100).rounded()))% mistakes",
+                            value: $store.goodThreshold, in: 0...0.5, step: 0.01)
+                    Stepper("Hard up to \(Int((store.hardThreshold * 100).rounded()))% mistakes",
+                            value: $store.hardThreshold, in: 0...0.5, step: 0.01)
+                    Button("Reset suggestion bands") { store.resetSuggestionThresholds() }
+                } header: {
+                    Text("Grading suggestions")
+                } footer: {
+                    Text("After a typing pass, 0 mistakes suggests Easy; a mistake rate at or under Good suggests Good, at or under Hard suggests Hard, above that Again — net of forgiven mistakes.")
+                }
                 Section("Export / Import (your data is yours)") {
                     Button("Prepare JSON export") {
                         do { exportURL = try store.exportURL() } catch { store.syncMessage = error.localizedDescription }
