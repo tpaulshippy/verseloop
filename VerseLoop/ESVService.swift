@@ -34,7 +34,7 @@ struct ESVService {
         req.timeoutInterval = 15
         let (data, resp) = try await URLSession.shared.data(for: req)
         guard (resp as? HTTPURLResponse)?.statusCode == 200 else {
-            throw ESVError.server("worker HTTP \((resp as? HTTPURLResponse)?.statusCode ?? -1)")
+            throw ESVError.server("server HTTP \((resp as? HTTPURLResponse)?.statusCode ?? -1)")
         }
         guard let decoded = try? JSONDecoder().decode(WorkerESVResponse.self, from: data),
               let t = decoded.text?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty else {

@@ -320,7 +320,7 @@ final class VerseStore: ObservableObject {
             switch self {
             case .noWorker: return "Sync is unavailable in this build."
             case .noCode: return "Pick a sync code in Settings (same code on both devices)."
-            case .badURL: return "Worker URL looks wrong."
+            case .badURL: return "Sync service URL looks wrong."
             case .server(let s): return "Sync failed: \(s)"
             }
         }
