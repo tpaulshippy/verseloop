@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import CryptoKit
+import UserNotifications
 
 /// Key + seal/open helpers. Pure functions so the crypto stays reviewable
 /// in one place and out of the UI/store logic.
@@ -58,14 +59,18 @@ final class VerseStore: ObservableObject {
     // Configurable in Settings; enforced good <= hard.
     @Published var goodThreshold: Double = 0.05 {
         didSet {
-            goodThreshold = min(max(goodThreshold, 0), 0.5)
+            // Guard every write: a set inside didSet re-triggers didSet,
+            // so unconditional clamping would recurse until stack overflow.
+            let clamped = min(max(goodThreshold, 0), 0.5)
+            if clamped != goodThreshold { goodThreshold = clamped; return }
             if goodThreshold > hardThreshold { hardThreshold = goodThreshold }
             UserDefaults.standard.set(goodThreshold, forKey: "verseloop.goodThreshold")
         }
     }
     @Published var hardThreshold: Double = 0.15 {
         didSet {
-            hardThreshold = min(max(hardThreshold, 0), 0.5)
+            let clamped = min(max(hardThreshold, 0), 0.5)
+            if clamped != hardThreshold { hardThreshold = clamped; return }
             if hardThreshold < goodThreshold { goodThreshold = hardThreshold }
             UserDefaults.standard.set(hardThreshold, forKey: "verseloop.hardThreshold")
         }
@@ -77,6 +82,44 @@ final class VerseStore: ObservableObject {
     }
     static let defaultGoodThreshold = 0.05
     static let defaultHardThreshold = 0.15
+
+    // MARK: - Reminders (local notifications, no server involved)
+
+    /// .immediate fires right when each verse's retry window arrives;
+    /// .daily sends one reminder at dailyReminderDate.
+    enum ReminderMode: String, CaseIterable, Codable {
+        case immediate
+        case daily
+
+        var title: String {
+            switch self {
+            case .immediate: return "When due"
+            case .daily: return "Daily"
+            }
+        }
+    }
+
+    @Published var remindersEnabled: Bool = false {
+        didSet {
+            UserDefaults.standard.set(remindersEnabled, forKey: "verseloop.remindersEnabled")
+            refreshReminders()
+        }
+    }
+    @Published var reminderMode: ReminderMode = .immediate {
+        didSet {
+            UserDefaults.standard.set(reminderMode.rawValue, forKey: "verseloop.reminderMode")
+            refreshReminders()
+        }
+    }
+    /// Time of day for .daily mode (date part ignored).
+    @Published var dailyReminderDate: Date = Calendar.current.date(bySettingHour: 8, minute: 0, second: 0, of: Date()) ?? Date() {
+        didSet {
+            UserDefaults.standard.set(dailyReminderDate, forKey: "verseloop.dailyReminderDate")
+            refreshReminders()
+        }
+    }
+    /// Non-empty when reminders are on but blocked (e.g. denied in Settings).
+    @Published var reminderStatus: String = ""
 
     // Settings (UserDefaults so they survive reinstalls of dev builds).
     // The Worker URL is fixed (your own deployment); the ESV key lives
@@ -120,6 +163,16 @@ final class VerseStore: ObservableObject {
         self.goodThreshold = good ?? Self.defaultGoodThreshold
         self.hardThreshold = hard ?? Self.defaultHardThreshold
         if self.hardThreshold < self.goodThreshold { self.hardThreshold = self.goodThreshold }
+        self.remindersEnabled = UserDefaults.standard.bool(forKey: "verseloop.remindersEnabled")
+        if let raw = UserDefaults.standard.string(forKey: "verseloop.reminderMode"),
+           let m = ReminderMode(rawValue: raw) {
+            self.reminderMode = m
+        }
+        if let t = UserDefaults.standard.object(forKey: "verseloop.dailyReminderDate") as? Date {
+            self.dailyReminderDate = t
+        }
+        // Pending requests survive restarts, but dues shift — rebuild once.
+        refreshReminders()
     }
 
     /// Random 128-bit code, grouped for transcription. Generated once;
@@ -179,6 +232,7 @@ final class VerseStore: ObservableObject {
         verses.append(v)
         reviews[v.id] = ReviewState(verseId: v.id, ease: 2.5, intervalDays: 0, due: now, reps: 0, lapses: 0, totalHints: 0, lastGrade: nil, updatedAt: now)
         save()
+        refreshReminders()
         scheduleAutoSync()
     }
 
@@ -200,6 +254,7 @@ final class VerseStore: ObservableObject {
         deleted.removeAll { $0.verseId == verse.id }
         deleted.append(DeletedEntry(verseId: verse.id, deletedAt: now))
         save()
+        refreshReminders()
         scheduleAutoSync()
     }
 
@@ -212,6 +267,7 @@ final class VerseStore: ObservableObject {
         reviews[verseId] = current.advanced(with: grade, mistakes: mistakes, now: Date())
         undoToast = "Graded \(grade.title) · \(mistakes) mistake\(mistakes == 1 ? "" : "s") — Undo"
         save()
+        refreshReminders()
         scheduleAutoSync()
     }
 
@@ -222,11 +278,94 @@ final class VerseStore: ObservableObject {
         reviews[last.verseId] = restored
         undoToast = nil
         save()
+        refreshReminders()
         scheduleAutoSync()
         return true
     }
 
     func clearUndoToast() { undoToast = nil }
+
+    // MARK: - Reminders scheduling
+
+    /// Asks for notification permission; Settings shows reminderStatus when blocked.
+    func ensureReminderPermission() async -> Bool {
+        do {
+            let granted = try await UNUserNotificationCenter.current()
+                .requestAuthorization(options: [.alert, .sound, .badge])
+            await updateReminderStatus()
+            return granted
+        } catch {
+            reminderStatus = "Couldn't ask for notification permission."
+            return false
+        }
+    }
+
+    func updateReminderStatus() async {
+        switch await UNUserNotificationCenter.current().notificationSettings().authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            reminderStatus = ""
+        case .denied:
+            reminderStatus = "Notifications are off for Verse Loop Daily — turn them on in the Settings app to get reminders."
+        default:
+            reminderStatus = ""
+        }
+    }
+
+    /// Fire-and-forget wrapper for sync mutation paths.
+    private func refreshReminders() {
+        Task { await rescheduleReminders() }
+    }
+
+    /// Rebuilds pending reminders from current dues + settings. Called after
+    /// every schedule-affecting change; idempotent and cheap (≤20 requests).
+    func rescheduleReminders() async {
+        let center = UNUserNotificationCenter.current()
+        let ours = await center.pendingNotificationRequests()
+            .filter { $0.identifier.hasPrefix("verseloop.reminder") }
+            .map(\.identifier)
+        if !ours.isEmpty { center.removePendingNotificationRequests(withIdentifiers: ours) }
+        guard remindersEnabled else { reminderStatus = ""; return }
+        switch await center.notificationSettings().authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            reminderStatus = ""
+        case .denied:
+            reminderStatus = "Notifications are off for Verse Loop Daily — turn them on in the Settings app to get reminders."
+            return
+        default:
+            return
+        }
+        switch reminderMode {
+        case .immediate:
+            // One request per upcoming due (already-due verses need no nudge).
+            let now = Date()
+            let upcoming = verses
+                .sorted { review(for: $0.id).due < review(for: $1.id).due }
+                .filter { review(for: $0.id).due > now }
+                .prefix(20)
+            for v in upcoming {
+                let due = review(for: v.id).due
+                let content = UNMutableNotificationContent()
+                content.title = "Verse due"
+                content.body = "\(v.reference) is ready to review."
+                let trigger = UNTimeIntervalNotificationTrigger(
+                    timeInterval: max(1, due.timeIntervalSince(now)), repeats: false)
+                try? await center.add(UNNotificationRequest(
+                    identifier: "verseloop.reminder.due-\(v.id.uuidString)",
+                    content: content, trigger: trigger))
+            }
+        case .daily:
+            let content = UNMutableNotificationContent()
+            content.title = "Time to review"
+            let n = dueCount
+            content.body = n > 0
+                ? "\(n) verse\(n == 1 ? "" : "s") due — open Today to review."
+                : "Open Today for your daily pass."
+            let comps = Calendar.current.dateComponents([.hour, .minute], from: dailyReminderDate)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
+            try? await center.add(UNNotificationRequest(
+                identifier: "verseloop.reminder.daily", content: content, trigger: trigger))
+        }
+    }
 
     // MARK: - Delete my data (App Store 5.1.1(i): revocation + deletion)
 
@@ -259,6 +398,7 @@ final class VerseStore: ObservableObject {
         try? FileManager.default.removeItem(at: libraryURL)
         // Persist the empty library so a relaunch stays empty (no demo reseed).
         save()
+        await rescheduleReminders()
         // Rotate the code so a stale server snapshot can never resurrect data.
         let fresh = Self.newSyncCode()
         syncCode = fresh
@@ -330,6 +470,7 @@ final class VerseStore: ObservableObject {
         let env = try JSONDecoder().decode(LibraryEnvelope.self, from: data)
         merge(env)
         save()
+        refreshReminders()
         scheduleAutoSync()
     }
 
@@ -435,6 +576,7 @@ final class VerseStore: ObservableObject {
             guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw SyncError.server("HTTP \((resp as? HTTPURLResponse)?.statusCode ?? -1)") }
             lastSyncAt = Date()
             syncMessage = "Synced \(verses.count) verses ✓"
+            await rescheduleReminders()
         } catch {
             syncMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
@@ -450,6 +592,7 @@ final class VerseStore: ObservableObject {
             lastSyncAt = Date()
             syncMessage = "Pulled \(verses.count) verses ✓"
             save()
+            await rescheduleReminders()
         } catch {
             syncMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }

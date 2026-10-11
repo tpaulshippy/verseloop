@@ -302,6 +302,36 @@ struct SettingsView: View {
                     if let d = store.lastSyncAt { Text("Last sync: \(d.formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(.secondary) }
                 }
                 Section {
+                    Toggle("Review reminders", isOn: $store.remindersEnabled)
+                    if store.remindersEnabled {
+                        Picker("Remind me", selection: $store.reminderMode) {
+                            Text("When verses become due").tag(VerseStore.ReminderMode.immediate)
+                            Text("Daily at a set time").tag(VerseStore.ReminderMode.daily)
+                        }
+                        if store.reminderMode == .daily {
+                            DatePicker("Time", selection: $store.dailyReminderDate, displayedComponents: .hourAndMinute)
+                        }
+                    }
+                    if !store.reminderStatus.isEmpty {
+                        Text(store.reminderStatus).font(.caption).foregroundStyle(.secondary)
+                        Button("Open Settings app") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Reminders")
+                } footer: {
+                    Text("“When verses become due” notifies as each verse's retry window arrives. “Daily” sends one reminder at your chosen time.")
+                }
+                .onChange(of: store.remindersEnabled) { _, on in
+                    Task {
+                        if on { _ = await store.ensureReminderPermission() }
+                        await store.rescheduleReminders()
+                    }
+                }
+                Section {
                     Stepper("Good up to \(Int((store.goodThreshold * 100).rounded()))% mistakes",
                             value: $store.goodThreshold, in: 0...0.5, step: 0.01)
                     Stepper("Hard up to \(Int((store.hardThreshold * 100).rounded()))% mistakes",
