@@ -132,6 +132,12 @@ final class VerseStore: ObservableObject {
         reviews[verseId] ?? .fresh(verseId: verseId)
     }
 
+    /// Next due verse after the given one, for ReviewView's Next button.
+    /// Returns nil when nothing else is due (caller shows Done instead).
+    func nextDueVerse(excluding excludedId: UUID) -> Verse? {
+        loopQueue.first { $0.id != excludedId && (reviews[$0.id] ?? .fresh(verseId: $0.id)).isDue }
+    }
+
     // MARK: - Mutations
 
     func addVerse(reference: String, text: String, source: String) {

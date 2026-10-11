@@ -46,9 +46,10 @@ struct ContentView: View {
 
 struct LoopTab: View {
     @EnvironmentObject var store: VerseStore
+    @State private var path = NavigationPath()
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             // Live 30s tick: due counts, countdown badges, and queue order
             // recompute as retry windows elapse — no restart needed.
             TimelineView(.periodic(from: .now, by: 30)) { _ in
@@ -60,9 +61,7 @@ struct LoopTab: View {
                         List {
                             ForEach(store.loopQueue) { verse in
                                 let r = store.review(for: verse.id)
-                                NavigationLink {
-                                    ReviewView(verse: verse)
-                                } label: {
+                                NavigationLink(value: verse) {
                                     VerseRow(verse: verse, review: r)
                                 }
                             }
@@ -73,6 +72,18 @@ struct LoopTab: View {
                 }
             }
             .navigationTitle("Today's Verses")
+            .navigationDestination(for: Verse.self) { verse in
+                ReviewView(
+                    verse: verse,
+                    onNext: { next in
+                        // Replace the just-graded verse so Back never lands
+                        // on a stale graded screen; stack stays one deep.
+                        if !path.isEmpty { path.removeLast() }
+                        path.append(next)
+                    },
+                    onDone: { path = NavigationPath() }
+                )
+            }
         }
     }
 

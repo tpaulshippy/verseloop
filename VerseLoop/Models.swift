@@ -6,7 +6,7 @@ import Foundation
 /// (Crossway copyright). ESV passages are fetched at runtime via the
 /// user's ESV API key or the bundled Cloudflare Worker proxy, then
 /// cached on-device for personal memorization use only.
-struct Verse: Identifiable, Codable, Equatable {
+struct Verse: Identifiable, Codable, Equatable, Hashable {
     var id: UUID
     var reference: String
     var text: String

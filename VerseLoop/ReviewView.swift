@@ -50,6 +50,10 @@ struct FlowLayout: Layout {
 struct ReviewView: View {
     @EnvironmentObject var store: VerseStore
     var verse: Verse
+    /// Navigation hooks from the Loop tab. Nil in standalone contexts
+    /// (UI-test hooks) where Next/Done just dismisses.
+    var onNext: ((Verse) -> Void)? = nil
+    var onDone: (() -> Void)? = nil
 
     // One unified stream: word indices 0..<words.count, then reference slots.
     @State private var idx = 0
@@ -352,13 +356,28 @@ struct ReviewView: View {
                 }
                 .buttonStyle(.bordered)
             }
-            Button("Next →") { dismiss() }
+            // Next due verse if one is waiting, otherwise Done back to Today.
+            Button(nextDue != nil ? "Next →" : "Done") { advanceToNext() }
                 .buttonStyle(.borderedProminent)
                 .frame(maxWidth: .infinity)
         }
         .task {
             try? await Task.sleep(nanoseconds: 8_000_000_000)
             store.clearUndoToast()
+        }
+    }
+
+    /// The next due verse after this one (nil when all caught up).
+    /// Evaluated live so the label flips to Done as soon as the queue drains.
+    private var nextDue: Verse? {
+        store.nextDueVerse(excluding: verse.id)
+    }
+
+    private func advanceToNext() {
+        if let next = store.nextDueVerse(excluding: verse.id) {
+            if let onNext { onNext(next) } else { dismiss() }
+        } else {
+            if let onDone { onDone() } else { dismiss() }
         }
     }
 
