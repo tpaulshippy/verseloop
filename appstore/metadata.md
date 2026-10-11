@@ -1,4 +1,4 @@
-# VerseLoop — App Store Connect metadata (en-US, v1.0)
+# Verse Loop Daily — App Store Connect metadata (en-US, v1.0)
 # Canonical copy-paste source. All fields verified Oct 2026.
 # Bundle: com.tpaulshippy.verseloop · v1.0 · iPhone-only · iOS 17+
 
@@ -11,7 +11,7 @@
 - In-app privacy link: Settings → Privacy & Support → Privacy Policy (same URL as above, reachable with no login)
 
 ## App Information
-- Name (30 chars max): VerseLoop
+- Name (30 chars max): Verse Loop Daily
 - Subtitle (30 chars max): Memorize ESV word by word
 - Primary Category: Education
 - Secondary Category: Reference
@@ -29,7 +29,7 @@ ESV-only memorization with real spaced repetition. Type first letters, forgive s
 ### Description (4000 chars)
 Start the day by memorizing ESV verses word-by-word — from first letters, with the reference tested last.
 
-VerseLoop is a native, offline-first iOS app with zero dependencies for one workflow: a daily Loop of due verses, a forgiving first-letter tester, and real SM-2 spaced repetition driven by your own Again / Hard / Good / Easy grades.
+Verse Loop Daily is a native, offline-first iOS app with zero dependencies for one workflow: a daily Loop of due verses, a forgiving first-letter tester, and real SM-2 spaced repetition driven by your own Again / Hard / Good / Easy grades.
 
 HOW IT WORKS
 • Today tab shows your due-sorted Loop: Due / Total / Mastered at a glance.
@@ -41,7 +41,7 @@ REAL SPACED REPETITION
 Every rep ends in an explicit grade → SM-2 ease + intervals (Again resets with 10-min retry; Hard ×1.2; Good 1d → 3d → ×ease; Easy 4d start with ease bonus). Due means end-of-day + interval. Only your grade moves the schedule.
 
 ESV-ONLY, LEGALLY
-Only the English Standard Version. ESV text © Crossway is never bundled — the app ships with two short public-domain KJV demo verses so it works offline, and fetches real ESV passages at runtime through your own Worker (free api.esv.org key held server-side, cached 24h). No key ever lives on-device.
+Only the English Standard Version. ESV text © Crossway is never bundled — the app ships with two short public-domain sample verses so it works offline, and fetches real ESV passages at runtime through the built-in secure service (cached for offline review). No setup needed, no key ever lives on-device.
 
 YOUR DATA IS YOURS
 • Offline-first JSON store (<100 KB typical). No account, no analytics, no ads, no tracking.

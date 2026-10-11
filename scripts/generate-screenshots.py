@@ -45,7 +45,7 @@ SHOTS = [
     ("04-graded.png", "Grade honestly", "Real SM-2 + 8s Undo",
      "Again / Hard / Good / Easy drives ease and intervals."),
     ("06-add-verse.png", "Add any passage", "ESV fetch built in",
-     "Ranges like Psalm 23:1-6 work. ESV arrives via your Worker."),
+     "Ranges like Psalm 23:1-6 work. ESV fills in automatically."),
     ("05-settings.png", "Yours, truly", "Encrypted backup · Delete anytime",
      "Export JSON anytime. Delete All My Data erases device + cloud."),
 ]
@@ -95,7 +95,7 @@ def make(src_name, headline, sub, caption, out_path):
     cy = sy + target_h + 60
     # wrap caption manually (two lines max)
     d.text((80, cy), caption, font=f_cap, fill=SUB)
-    d.text((80, H - 140), "VerseLoop  •  ESV-only  •  Offline-first  •  No account", font=f_foot, fill=(110, 125, 118))
+    d.text((80, H - 140), "Verse Loop Daily  •  ESV-only  •  Offline-first  •  No account", font=f_foot, fill=(110, 125, 118))
     canvas.save(out_path, "PNG")
     print(out_path, canvas.size)
 

@@ -90,7 +90,7 @@ struct LoopTab: View {
         VStack(spacing: 12) {
             Image(systemName: "checkmark.circle.fill").font(.system(size: 56)).foregroundStyle(.green)
             Text("All caught up.").font(.title2).bold()
-            Text("Add a verse in the Verses tab — ESV text arrives through your Worker.").foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal)
+            Text("Add a verse in the Verses tab — ESV text fills in automatically.").foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal)
             Spacer()
         }.padding(.top, 40)
     }
@@ -228,7 +228,7 @@ struct AddVerseView: View {
                         Text(e).font(.caption).foregroundStyle(.red)
                     }
                 } footer: {
-                    Text("ESV text is fetched through your Worker (ranges like Psalm 23:1-6 work too).")
+                    Text("ESV text is fetched automatically (ranges like Psalm 23:1-6 work too).")
                 }
                 Section("Text \(fetchedESV ? "· ESV ✓" : "")") {
                     TextEditor(text: $text).frame(minHeight: 140)
@@ -295,7 +295,7 @@ struct SettingsView: View {
                         do { exportURL = try store.exportURL() } catch { store.syncMessage = error.localizedDescription }
                     }
                     if let u = exportURL {
-                        ShareLink(item: u, subject: Text("VerseLoop export"), message: Text("VerseLoop library export (JSON v1)")) {
+                        ShareLink(item: u, subject: Text("Verse Loop Daily export"), message: Text("Verse Loop Daily library export (JSON v1)")) {
                             Label("Share export file", systemImage: "square.and.arrow.up")
                         }
                     }
@@ -303,7 +303,7 @@ struct SettingsView: View {
                     Button("Import pasted JSON…") { pastedJSON = ""; isPasting = true }
                 }
                 Section("About") {
-                    Text("VerseLoop · ESV-only memorization with real SM-2 spaced repetition, forgiving first-letter testing, and exportable sync.").font(.caption)
+                    Text("Verse Loop Daily · ESV-only memorization with real SM-2 spaced repetition, forgiving first-letter testing, and exportable sync.").font(.caption)
                     Text(ESVService.attribution).font(.caption).foregroundStyle(.secondary)
                     Text("Verses: \(store.verses.count) · Due: \(store.dueCount)").font(.caption).foregroundStyle(.secondary)
                 }
@@ -375,7 +375,7 @@ struct SettingsView: View {
                                 .autocorrectionDisabled()
                                 .textInputAutocapitalization(.never)
                         } footer: {
-                            Text("Paste a VerseLoop JSON export (same format as the export file).")
+                            Text("Paste a Verse Loop Daily JSON export (same format as the export file).")
                         }
                         Section {
                             Button("Import") {
@@ -385,7 +385,7 @@ struct SettingsView: View {
                                     store.syncMessage = "Imported ✓"
                                     isPasting = false
                                 } catch {
-                                    store.syncMessage = "Import failed — not a VerseLoop export."
+                                    store.syncMessage = "Import failed — not a Verse Loop Daily export."
                                 }
                             }
                             .disabled(pastedJSON.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)

@@ -1,4 +1,4 @@
-# VerseLoop — ESV-only memorization with real spaced repetition
+# Verse Loop Daily — ESV-only memorization with real spaced repetition
 
 A native iOS app (SwiftUI, zero dependencies) for one workflow: **starting the day by memorizing ESV verses word-by-word from first letters, with the reference tested last** — without being punished for fat-finger slips, and without your verses being trapped on one device.
 
@@ -6,7 +6,7 @@ Built as an alternative to Versify for that single workflow. It is deliberately 
 
 ## The UX difference (why it's not a clone)
 
-| Versify | VerseLoop |
+| Versify | Verse Loop Daily |
 |---|---|
 | Game list + auto-scored taps | Single due-sorted **Loop**: one verse at a time |
 | Type mode with no per-error recourse | Wrong letter **buzzes + marks a red mistake** — tap any red word to forgive it as **accidental** |
@@ -62,7 +62,7 @@ No signing team needed for simulator. For your physical SE3: open `VerseLoop.xco
 
 Prereqs: paid Apple Developer membership + the app's bundle ID (`com.tpaulshippy.verseloop`) registered to your team (Xcode automatic signing does this).
 
-1. **App Store Connect**: [apps](https://appstoreconnect.apple.com/apps) → **+** → New App → name `VerseLoop`, bundle ID `com.tpaulshippy.verseloop`, SKU `verseloop`.
+1. **App Store Connect**: [apps](https://appstoreconnect.apple.com/apps) → **+** → New App → name `Verse Loop Daily`, bundle ID `com.tpaulshippy.verseloop`, SKU `verseloop`.
 2. **Archive**: in Xcode set the VerseLoop target's team, then Product → Archive (Release). Or run `./scripts/archive-testflight.sh` after putting your Team ID in `scripts/ExportOptions.plist`.
 3. **Distribute**: Organizer → Distribute App → TestFlight & App Store → upload. Wait for processing (~10–60 min; you'll get an email).
 4. **Testers**: App Store Connect → your app → TestFlight → add yourself as an **internal tester** (no beta review needed). Install Apple's **TestFlight** app on the SE3, accept the invite.

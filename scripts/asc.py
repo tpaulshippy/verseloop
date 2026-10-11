@@ -64,7 +64,7 @@ def main():
             "/v1/apps",
             {"data": {"type": "apps", "attributes": {
                 "bundleId": "com.tpaulshippy.verseloop",
-                "name": "VerseLoop",
+                "name": "Verse Loop Daily",
                 "primaryLocale": "en-US",
                 "sku": "verseloop",
             }}},
@@ -76,7 +76,7 @@ def main():
             "/v1/bundleIds",
             {"data": {"type": "bundleIds", "attributes": {
                 "identifier": "com.tpaulshippy.verseloop",
-                "name": "VerseLoop",
+                "name": "Verse Loop Daily",
                 "platform": "IOS",
             }}},
         )
