@@ -17,7 +17,7 @@ echo "Installed + launched on iPhone SE (3rd generation)."
 
 # Record a video: in another terminal run
 #   xcrun simctl io booted recordVideo recordings/verseloop-se3.mov
-# then drive the UI test:
+# then drive the UI tests (whole class: single-verse + range flows):
 #   xcodebuild test -project VerseLoop.xcodeproj -scheme VerseLoop \
 #     -destination "$DEST" CODE_SIGNING_ALLOWED=NO \
-#     -only-testing:VerseLoopUITests/VerseLoopUITests/testLoopFlow
+#     -only-testing:VerseLoopUITests

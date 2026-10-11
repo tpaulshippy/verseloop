@@ -64,31 +64,29 @@ struct ReviewView: View {
 
     private var words: [String] { verse.words }
 
-    /// "Psalm 23:1" -> book "Psalm", chapter "23", verse "1".
+    /// "Psalm 23:1-6" -> book "Psalm", tail "23:1-6".
     /// Parenthetical suffixes (e.g. demo labels) are stripped first.
-    private var refParts: (book: String, chapter: String, verse: String, hasColon: Bool) {
+    private var refParts: (book: String, tail: String) {
         let core = verse.reference.split(separator: "(").first
             .map { $0.trimmingCharacters(in: .whitespaces) } ?? verse.reference
         guard let lastSpace = core.lastIndex(of: " "),
               lastSpace < core.index(before: core.endIndex) else {
-            return (core, "", "", false) // e.g. "Jude": book only
+            return (core, "") // e.g. "Jude": book only
         }
         let book = String(core[..<lastSpace]).trimmingCharacters(in: .whitespaces)
         let tail = String(core[core.index(after: lastSpace)...])
-        if let colon = tail.firstIndex(of: ":") {
-            return (book, String(tail[..<colon]), String(tail[tail.index(after: colon)...]), true)
-        }
-        return (book, tail, "", false)
+        return (book, tail)
     }
 
     /// Typing stream for the reference: book initial, then tail digits.
+    /// Separators (`:`, `-`, …) are never typed — they appear on their own.
     private var refExpected: [String] {
         let p = refParts
         var out: [String] = []
         if let initial = p.book.first(where: { $0.isLetter }) {
             out.append(String(initial))
         }
-        out.append(contentsOf: (p.chapter + p.verse).map(String.init))
+        out.append(contentsOf: p.tail.filter(\.isNumber).map(String.init))
         return out
     }
 
@@ -173,56 +171,53 @@ struct ReviewView: View {
         .frame(maxWidth: .infinity, minHeight: 60, alignment: .topLeading)
     }
 
-    // MARK: reference — composes inline as "Psalm 23:1", styled like words
+    // MARK: reference — composes inline ("Psalm 23:1-6"), styled like words.
+    // Tail digits are typed slots; separators (:, -, …) appear on their own
+    // once everything before them is revealed. So ranges just work.
+
+    /// Tail mapped to stream slots: digits carry their stream index,
+    /// separators carry nil and render statically in flow position.
+    private var tailSlots: [(char: Character, stream: Int?)] {
+        let w = words.count
+        var typedOrdinal = 0
+        return refParts.tail.map { ch -> (Character, Int?) in
+            if ch.isNumber {
+                typedOrdinal += 1
+                return (ch, w + typedOrdinal) // +1: slot 0 is the book initial
+            }
+            return (ch, nil)
+        }
+    }
 
     private var referenceRow: some View {
         let p = refParts
         let w = words.count
-        // Stream slot 0 reveals the whole book name; the rest reveal per digit.
         let bookSlot = w
-        let chapterBase = w + 1
-        let verseBase = chapterBase + p.chapter.count
         return HStack(alignment: .top, spacing: 0) {
             if revealed.contains(bookSlot) {
                 mistakeChip(label: p.book, index: bookSlot)
                 Text(" ").font(.title3)
             }
-            if !p.chapter.isEmpty && chapterStarted {
-                HStack(spacing: 2) {
-                    ForEach(Array(p.chapter.enumerated()), id: \.offset) { j, ch in
-                        let i = chapterBase + j
-                        if revealed.contains(i) {
-                            mistakeChip(label: String(ch), index: i, refTag: i)
-                        }
+            ForEach(Array(tailSlots.enumerated()), id: \.offset) { k, slot in
+                if let s = slot.stream {
+                    if revealed.contains(s) {
+                        mistakeChip(label: String(slot.char), index: s, refTag: s)
                     }
-                }
-            }
-            if p.hasColon && chapterComplete {
-                Text(":").font(.title3).foregroundStyle(.secondary)
-            }
-            if !p.verse.isEmpty {
-                HStack(spacing: 2) {
-                    ForEach(Array(p.verse.enumerated()), id: \.offset) { j, ch in
-                        let i = verseBase + j
-                        if revealed.contains(i) {
-                            mistakeChip(label: String(ch), index: i, refTag: i)
-                        }
-                    }
+                } else if tailStaticVisible(k) {
+                    Text(String(slot.char)).font(.title3).foregroundStyle(.secondary)
                 }
             }
         }
     }
 
-    private var chapterComplete: Bool {
-        let p = refParts
-        let chapterBase = words.count + 1
-        return !p.chapter.isEmpty && (0..<p.chapter.count).allSatisfy { revealed.contains(chapterBase + $0) }
-    }
-
-    private var chapterStarted: Bool {
-        let p = refParts
-        let chapterBase = words.count + 1
-        return !p.chapter.isEmpty && (0..<p.chapter.count).contains(where: { revealed.contains(chapterBase + $0) })
+    /// A separator shows once every typed slot before it is revealed.
+    private func tailStaticVisible(_ k: Int) -> Bool {
+        let slots = tailSlots
+        guard k < slots.count else { return false }
+        for j in 0..<k {
+            if let s = slots[j].stream, !revealed.contains(s) { return false }
+        }
+        return true
     }
 
     /// A revealed item: full color normally, red with an "accidental?"

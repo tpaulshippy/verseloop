@@ -88,4 +88,26 @@ final class VerseLoopUITests: XCTestCase {
         snap(app, "06-add-verse")
         app.buttons["Cancel"].tap()
     }
+
+    /// Multi-verse range: Psalm 23:1-2 types through 25 initials plus
+    /// P2312, and the reference composes with its colon and dash.
+    func testRangeFlow() throws {
+        let app = XCUIApplication(bundleIdentifier: bundleID)
+        app.launchArguments = ["-UITestRange"]
+        app.launch()
+        let field = app.textFields["first-letter-input"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        app.staticTexts["mistake-count"].tap()
+        // 25 word initials, then P2312 — one smooth session.
+        field.typeText("tlimsisnwhmmtldigphlmbtsw")
+        XCTAssertTrue(app.buttons["Show character"].waitForExistence(timeout: 10))
+        app.staticTexts["mistake-count"].tap()
+        field.typeText("P2312")
+        XCTAssertTrue(app.staticTexts["Suggested: Easy — but your grade decides, as always."].waitForExistence(timeout: 10))
+        // The book chip is a (disabled) button carrying its label.
+        XCTAssertTrue(app.buttons["Psalm"].waitForExistence(timeout: 5))
+        snap(app, "07-range-ref")
+        app.buttons["Good"].tap()
+        XCTAssertTrue(app.buttons["Next →"].waitForExistence(timeout: 5))
+    }
 }

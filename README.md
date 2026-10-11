@@ -14,7 +14,7 @@ Built as an alternative to Versify for that single workflow. It is deliberately 
 | Progress bar, no mistake accounting | No progress bar — a **mistake count** in the header, net of forgiven slips, plus a suggested grade |
 | Library stuck on-device | **JSON export/import + optional Worker sync code** — same code on two devices, push/pull |
 
-Tester: the reference stays **hidden** and no word counts are shown. **Type the first letter** of each word, one at a time — then, without breaking stride, the **reference: book initial, then numbers** (colon skipped). `tlimsisnwp231` flows in as one session, the reference composing inline as **Psalm 23:1**, styled just like the words. Right character → it appears; wrong → haptic buzz, red mistake, move on. Every mistake carries its own "accidental?" toggle (shake forgives the latest too). No instruction chrome — just due state and mistake count. Then see mistakes + a suggested grade, and grade. Grades get an **8-second Undo** too. Full dark-mode support throughout.
+Tester: the reference stays **hidden** and no word counts are shown. **Type the first letter** of each word, one at a time — then, without breaking stride, the **reference: book initial, then numbers** (colon skipped). `tlimsisnwp231` flows in as one session, the reference composing inline as **Psalm 23:1**, styled just like the words. Multi-verse passages work too (`Psalm 23:1-6` types `…p2316`, separators appearing on their own). Right character → it appears; wrong → haptic buzz, red mistake, move on. Every mistake carries its own "accidental?" toggle (shake forgives the latest too). No instruction chrome — just due state and mistake count. Then see mistakes + a suggested grade, and grade. Grades get an **8-second Undo** too. Full dark-mode support throughout.
 
 ## ESV-only, legally
 
@@ -94,8 +94,10 @@ SM-2-lite (Anki-style): Again resets (10-min retry, ease −0.20, lapse+1); Hard
 - `02-review-mistake.png` — wrong first letter → red mistake word + "1 mistake"
 - `03-review-forgiven.png` — mistake forgiven as accidental → "0 mistakes"
 - `04-graded.png` — graded Good → next due date, Undo window
-- `05-settings.png` — ESV key, Worker sync, export/import
-- `06-add-verse.png` — Add verse with ESV fetch
+- `05-settings.png` — sync, export/import, about
+- `06-add-verse.png` — Add verse with ESV fetch (ranges like `Psalm 23:1-6` accepted)
+- `07-range-ref.png` — multi-verse range composed inline with colon + dash
 
-`VerseLoopUITests/testLoopFlow` drives the whole pass and **passes** on the SE3 sim:
-Loop → tap verse → tester appears → type wrong letter → "1 mistake" → forgive it → "0 mistakes" → type the rest → suggested grade → Good → Undo grade → re-grade → Next → Settings → Add sheet.
+`VerseLoopUITests` drives both passes and **passes** on the SE3 sim:
+`testLoopFlow`: Loop → tap verse → tester appears → type wrong letter → "1 mistake" → forgive it → "0 mistakes" → type the rest → reference `P231` → suggested grade → Good → Undo grade → re-grade → Next → Settings → Add sheet.
+`testRangeFlow`: Psalm 23:1-2 straight through (25 initials + `P2312`) → composed reference → grade.
