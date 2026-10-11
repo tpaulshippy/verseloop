@@ -87,6 +87,12 @@ final class VerseLoopUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Add verse"].waitForExistence(timeout: 10))
         snap(app, "06-add-verse")
         app.buttons["Cancel"].tap()
+
+        // Verses-tab taps open the editor, not practice.
+        app.staticTexts["Psalm 23:1 (demo · KJV)"].tap()
+        XCTAssertTrue(app.staticTexts["Edit verse"].waitForExistence(timeout: 10))
+        snap(app, "09-edit-verse")
+        app.buttons["Cancel"].tap()
     }
 
     /// Multi-verse range: Psalm 23:1-2 types through 25 initials plus

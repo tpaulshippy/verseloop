@@ -42,6 +42,16 @@ final class VerseStore: ObservableObject {
     @Published var reviews: [UUID: ReviewState] = [:]
     @Published var lastSyncAt: Date?
     @Published var syncMessage: String = ""
+    /// Tombstones so deletes propagate instead of resurrecting on pull.
+    var deleted: [DeletedEntry] = []
+
+    @Published var autoSyncEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(autoSyncEnabled, forKey: "verseloop.autosync")
+            if !autoSyncEnabled { autoSyncTask?.cancel() }
+        }
+    }
+    private var autoSyncTask: Task<Void, Never>?
 
     // Settings (UserDefaults so they survive reinstalls of dev builds).
     // The Worker URL is fixed (your own deployment); the ESV key lives
@@ -66,6 +76,14 @@ final class VerseStore: ObservableObject {
         let code = storedCode.isEmpty ? Self.newSyncCode() : storedCode
         self.syncCode = code
         if storedCode.isEmpty { UserDefaults.standard.set(code, forKey: "verseloop.synccode") }
+        // UserDefaults.bool(forKey:) is false when unset — but auto-sync
+        // should default ON. Track "has been set" explicitly.
+        if UserDefaults.standard.object(forKey: "verseloop.autosync") == nil {
+            self.autoSyncEnabled = true
+            UserDefaults.standard.set(true, forKey: "verseloop.autosync")
+        } else {
+            self.autoSyncEnabled = UserDefaults.standard.bool(forKey: "verseloop.autosync")
+        }
         if !load() { seedDemo() }
     }
 
@@ -115,16 +133,33 @@ final class VerseStore: ObservableObject {
         let cleanRef = reference.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanRef.isEmpty, !cleanText.isEmpty else { return }
-        let v = Verse(reference: cleanRef, text: cleanText, textSource: source)
+        let now = Date()
+        let v = Verse(reference: cleanRef, text: cleanText, textSource: source, addedAt: now, updatedAt: now)
         verses.append(v)
-        reviews[v.id] = .fresh(verseId: v.id)
+        reviews[v.id] = ReviewState(verseId: v.id, ease: 2.5, intervalDays: 0, due: now, reps: 0, lapses: 0, totalHints: 0, lastGrade: nil, updatedAt: now)
         save()
+        scheduleAutoSync()
+    }
+
+    func updateVerse(_ verse: Verse, reference: String, text: String, source: String) {
+        let cleanRef = reference.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanRef.isEmpty, !cleanText.isEmpty else { return }
+        guard let i = verses.firstIndex(where: { $0.id == verse.id }) else { return }
+        let now = Date()
+        verses[i] = Verse(id: verse.id, reference: cleanRef, text: cleanText, textSource: source, addedAt: verse.addedAt, updatedAt: now)
+        save()
+        scheduleAutoSync()
     }
 
     func deleteVerse(_ verse: Verse) {
         verses.removeAll { $0.id == verse.id }
         reviews.removeValue(forKey: verse.id)
+        let now = Date()
+        deleted.removeAll { $0.verseId == verse.id }
+        deleted.append(DeletedEntry(verseId: verse.id, deletedAt: now))
         save()
+        scheduleAutoSync()
     }
 
     /// Explicit grade after a typing pass. `mistakes` is the mistake count
@@ -133,16 +168,20 @@ final class VerseStore: ObservableObject {
     func grade(_ verseId: UUID, grade: Grade, mistakes: Int) {
         let current = review(for: verseId)
         gradeUndoStack.append(GradeUndo(verseId: verseId, previous: current, grade: grade))
-        reviews[verseId] = current.advanced(with: grade, mistakes: mistakes)
+        reviews[verseId] = current.advanced(with: grade, mistakes: mistakes, now: Date())
         undoToast = "Graded \(grade.title) · \(mistakes) mistake\(mistakes == 1 ? "" : "s") — Undo"
         save()
+        scheduleAutoSync()
     }
 
     func undoLastGrade() -> Bool {
         guard let last = gradeUndoStack.popLast() else { return false }
-        reviews[last.verseId] = last.previous
+        var restored = last.previous
+        restored.updatedAt = Date()
+        reviews[last.verseId] = restored
         undoToast = nil
         save()
+        scheduleAutoSync()
         return true
     }
 
@@ -156,7 +195,7 @@ final class VerseStore: ObservableObject {
     }
 
     func save() {
-        let env = LibraryEnvelope(version: 1, verses: verses, reviews: Array(reviews.values))
+        let env = LibraryEnvelope(version: 2, verses: verses, reviews: Array(reviews.values), deleted: deleted)
         do {
             let data = try JSONEncoder().encode(env)
             try data.write(to: libraryURL, options: .atomic)
@@ -171,25 +210,28 @@ final class VerseStore: ObservableObject {
               let env = try? JSONDecoder().decode(LibraryEnvelope.self, from: data) else { return false }
         verses = env.verses
         reviews = Dictionary(uniqueKeysWithValues: env.reviews.map { ($0.verseId, $0) })
+        deleted = env.deleted
         return true
     }
 
     /// Public-domain KJV seeds so the simulator build is usable with zero
     /// network and zero copyrighted text. Real ESV verses are added via Fetch.
     private func seedDemo() {
+        let now = Date()
         let seeds = [
-            Verse(reference: "Psalm 23:1 (demo · KJV)", text: "The LORD is my shepherd; I shall not want.", textSource: "kjv-demo"),
-            Verse(reference: "Proverbs 3:5 (demo · KJV)", text: "Trust in the LORD with all thine heart; and lean not unto thine own understanding.", textSource: "kjv-demo"),
+            Verse(reference: "Psalm 23:1 (demo · KJV)", text: "The LORD is my shepherd; I shall not want.", textSource: "kjv-demo", addedAt: now, updatedAt: now),
+            Verse(reference: "Proverbs 3:5 (demo · KJV)", text: "Trust in the LORD with all thine heart; and lean not unto thine own understanding.", textSource: "kjv-demo", addedAt: now, updatedAt: now),
         ]
         verses = seeds
-        reviews = Dictionary(uniqueKeysWithValues: seeds.map { ($0.id, ReviewState.fresh(verseId: $0.id)) })
+        reviews = Dictionary(uniqueKeysWithValues: seeds.map { ($0.id, ReviewState(verseId: $0.id, ease: 2.5, intervalDays: 0, due: now, reps: 0, lapses: 0, totalHints: 0, lastGrade: nil, updatedAt: now)) })
+        deleted = []
         save()
     }
 
     // MARK: - Export / Import (fixes "no way to get my data out")
 
     func exportURL() throws -> URL {
-        let env = LibraryEnvelope(version: 1, verses: verses, reviews: Array(reviews.values))
+        let env = LibraryEnvelope(version: 2, verses: verses, reviews: Array(reviews.values), deleted: deleted)
         let data = try JSONEncoder().encode(env)
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("verseloop-export.json")
         try data.write(to: url, options: .atomic)
@@ -203,11 +245,13 @@ final class VerseStore: ObservableObject {
     }
 
     /// Import from pasted text (Settings → Import from pasted JSON).
-    /// Same merge rule as file import: imported records win by id.
+    /// Newer-wins per record (same rule as pull), so imports can't regress
+    /// newer local grades either.
     func importJSON(_ data: Data) throws {
         let env = try JSONDecoder().decode(LibraryEnvelope.self, from: data)
         merge(env)
         save()
+        scheduleAutoSync()
     }
 
     enum ImportError: LocalizedError {
@@ -239,21 +283,79 @@ final class VerseStore: ObservableObject {
         }
     }
 
+    // MARK: - Automatic sync (stale-safe)
+
+    /// Debounced push after every local mutation (add / practice / delete /
+    /// undo / import). Coalesces rapid grades into one network write.
+    private func scheduleAutoSync() {
+        guard autoSyncEnabled else { return }
+        autoSyncTask?.cancel()
+        autoSyncTask = Task {
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            guard !Task.isCancelled else { return }
+            await self.push()
+        }
+    }
+
+    /// One pull on app launch so a second device picks up the latest
+    /// snapshot without opening Settings. Stale snapshots can't regress
+    /// local state — merge is newer-wins per record.
+    func autoPullOnLaunch() async {
+        guard autoSyncEnabled else { return }
+        await pull()
+    }
+
+    private struct RemoteSnapshot {
+        let envelope: LibraryEnvelope
+    }
+
+    /// GET the server snapshot and decrypt it. Returns nil on 404 (never
+    /// pushed). Throws SyncError.server("wrong sync code…") when the
+    /// ciphertext can't be opened with the current code — callers must NOT
+    /// push in that case, or they'd overwrite someone else's snapshot.
+    private func fetchRemote() async throws -> RemoteSnapshot? {
+        let url = try syncEndpoint(path: "")
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 15
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse else { throw SyncError.server("bad response") }
+        if http.statusCode == 404 { return nil }
+        guard http.statusCode == 200 else { throw SyncError.server("HTTP \(http.statusCode)") }
+        let code = syncCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !code.isEmpty else { throw SyncError.noCode }
+        // v2 (encrypted) first, v1 plaintext as fallback for old snapshots.
+        if let enc = try? JSONDecoder().decode(EncryptedEnvelope.self, from: data),
+           enc.version == 2, !enc.ciphertext.isEmpty {
+            do {
+                return RemoteSnapshot(envelope: try SyncCrypto.open(enc, code: code))
+            } catch {
+                throw SyncError.server("wrong sync code or corrupt snapshot")
+            }
+        }
+        return RemoteSnapshot(envelope: try JSONDecoder().decode(LibraryEnvelope.self, from: data))
+    }
+
+    /// Read-modify-write: pull-merge first so a stale local push can never
+    /// clobber newer server state, then upload the merged result.
     func push() async {
         do {
+            if let remote = try await fetchRemote() {
+                merge(remote.envelope)
+                save()
+            }
             let url = try syncEndpoint(path: "")
             var req = URLRequest(url: url)
             req.httpMethod = "PUT"
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.timeoutInterval = 15
-            let inner = LibraryEnvelope(version: 1, verses: verses, reviews: Array(reviews.values))
+            let inner = LibraryEnvelope(version: 2, verses: verses, reviews: Array(reviews.values), deleted: deleted)
             let code = syncCode.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !code.isEmpty else { throw SyncError.noCode }
             req.httpBody = try JSONEncoder().encode(SyncCrypto.seal(inner, code: code))
             let (_, resp) = try await URLSession.shared.data(for: req)
             guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw SyncError.server("HTTP \((resp as? HTTPURLResponse)?.statusCode ?? -1)") }
             lastSyncAt = Date()
-            syncMessage = "Pushed \(verses.count) verses, encrypted ✓"
+            syncMessage = "Synced \(verses.count) verses ✓"
         } catch {
             syncMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
@@ -261,25 +363,11 @@ final class VerseStore: ObservableObject {
 
     func pull() async {
         do {
-            let url = try syncEndpoint(path: "")
-            var req = URLRequest(url: url)
-            req.timeoutInterval = 15
-            let (data, resp) = try await URLSession.shared.data(for: req)
-            guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw SyncError.server("HTTP \((resp as? HTTPURLResponse)?.statusCode ?? -1)") }
-            let code = syncCode.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !code.isEmpty else { throw SyncError.noCode }
-            // v2 (encrypted) first, v1 plaintext as fallback for old snapshots.
-            if let enc = try? JSONDecoder().decode(EncryptedEnvelope.self, from: data),
-               enc.version == 2, !enc.ciphertext.isEmpty {
-                do {
-                    merge(try SyncCrypto.open(enc, code: code))
-                } catch {
-                    throw SyncError.server("wrong sync code or corrupt snapshot")
-                }
-            } else {
-                let env = try JSONDecoder().decode(LibraryEnvelope.self, from: data)
-                merge(env)
+            guard let remote = try await fetchRemote() else {
+                syncMessage = "No snapshot yet — push first"
+                return
             }
+            merge(remote.envelope)
             lastSyncAt = Date()
             syncMessage = "Pulled \(verses.count) verses ✓"
             save()
@@ -288,11 +376,54 @@ final class VerseStore: ObservableObject {
         }
     }
 
+    /// Newer-wins per record + tombstones:
+    /// - verses/reviews keep whichever side has the larger updatedAt (ties: local)
+    /// - deletes propagate via tombstones; tombstoned ids are not resurrected
+    ///   by older snapshots
     private func merge(_ env: LibraryEnvelope) {
+        var tombById: [UUID: Date] = Dictionary(uniqueKeysWithValues: deleted.map { ($0.verseId, $0.deletedAt) })
+        for d in env.deleted {
+            if let cur = tombById[d.verseId] {
+                if d.deletedAt > cur { tombById[d.verseId] = d.deletedAt }
+            } else {
+                tombById[d.verseId] = d.deletedAt
+            }
+        }
         var vById = Dictionary(uniqueKeysWithValues: verses.map { ($0.id, $0) })
-        for v in env.verses { vById[v.id] = v }
+        for v in env.verses {
+            if let local = vById[v.id] {
+                if v.updatedAt > local.updatedAt { vById[v.id] = v }
+            } else {
+                if let t = tombById[v.id], v.updatedAt <= t { continue }
+                vById[v.id] = v
+            }
+        }
+        for (id, t) in tombById {
+            if let v = vById[id], v.updatedAt <= t { vById.removeValue(forKey: id) }
+        }
         verses = Array(vById.values).sorted { $0.addedAt < $1.addedAt }
-        for r in env.reviews { reviews[r.verseId] = r }
+        for r in env.reviews {
+            if let t = tombById[r.verseId], r.updatedAt <= t { continue }
+            if let local = reviews[r.verseId] {
+                if r.updatedAt > local.updatedAt { reviews[r.verseId] = r }
+            } else {
+                reviews[r.verseId] = r
+            }
+        }
+        for (id, t) in tombById {
+            if let local = reviews[id], local.updatedAt <= t { reviews.removeValue(forKey: id) }
+        }
+        // Prune tombstones resurrected by a newer verse; keep the rest so
+        // very old snapshots can't resurrect deletes.
+        var kept: [DeletedEntry] = []
+        for (id, t) in tombById {
+            if let v = vById[id] {
+                if v.updatedAt <= t { kept.append(DeletedEntry(verseId: id, deletedAt: t)) }
+            } else {
+                kept.append(DeletedEntry(verseId: id, deletedAt: t))
+            }
+        }
+        deleted = kept
     }
 
     func esvService() -> ESVService {

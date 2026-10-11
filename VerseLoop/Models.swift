@@ -13,13 +13,33 @@ struct Verse: Identifiable, Codable, Equatable {
     /// "esv" | "manual" | "kjv-demo" (public-domain seeds for simulator/demo)
     var textSource: String
     var addedAt: Date
+    /// Last local mutation (creation/edit). Drives newer-wins merge so a
+    /// stale pull never reverts newer local state.
+    var updatedAt: Date
 
-    init(id: UUID = UUID(), reference: String, text: String, textSource: String, addedAt: Date = Date()) {
+    init(id: UUID = UUID(), reference: String, text: String, textSource: String, addedAt: Date = Date(), updatedAt: Date? = nil) {
         self.id = id
         self.reference = reference
         self.text = text
         self.textSource = textSource
         self.addedAt = addedAt
+        self.updatedAt = updatedAt ?? addedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, reference, text, textSource, addedAt, updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        reference = try c.decode(String.self, forKey: .reference)
+        text = try c.decode(String.self, forKey: .text)
+        textSource = try c.decode(String.self, forKey: .textSource)
+        addedAt = try c.decode(Date.self, forKey: .addedAt)
+        // Old libraries (v1) have no updatedAt — fall back to addedAt so
+        // existing records tie (local kept) until either side mutates.
+        updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? addedAt
     }
 
     var words: [String] {
@@ -72,10 +92,54 @@ struct ReviewState: Codable, Equatable {
     /// only explicit grades move the schedule.
     var totalHints: Int
     var lastGrade: Grade?
+    /// Last local grade/undo. Newer-wins on merge so stale pulls can't
+    /// regress SM-2 progress.
+    var updatedAt: Date
 
     private enum CodingKeys: String, CodingKey {
         case verseId, ease, intervalDays, due, reps, lapses, lastGrade
         case totalHints = "totalPeeks" // v1 key kept so existing libraries still decode
+        case updatedAt
+    }
+
+    init(verseId: UUID, ease: Double, intervalDays: Int, due: Date, reps: Int, lapses: Int, totalHints: Int, lastGrade: Grade?, updatedAt: Date? = nil) {
+        self.verseId = verseId
+        self.ease = ease
+        self.intervalDays = intervalDays
+        self.due = due
+        self.reps = reps
+        self.lapses = lapses
+        self.totalHints = totalHints
+        self.lastGrade = lastGrade
+        self.updatedAt = updatedAt ?? Date()
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        verseId = try c.decode(UUID.self, forKey: .verseId)
+        ease = try c.decode(Double.self, forKey: .ease)
+        intervalDays = try c.decode(Int.self, forKey: .intervalDays)
+        due = try c.decode(Date.self, forKey: .due)
+        reps = try c.decode(Int.self, forKey: .reps)
+        lapses = try c.decode(Int.self, forKey: .lapses)
+        totalHints = try c.decodeIfPresent(Int.self, forKey: .totalHints) ?? 0
+        lastGrade = try c.decodeIfPresent(Grade.self, forKey: .lastGrade)
+        // Old records have no updatedAt. Fall back to the epoch so any
+        // newly-graded record strictly wins; two old records tie (local kept).
+        updatedAt = try c.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date(timeIntervalSince1970: 0)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(verseId, forKey: .verseId)
+        try c.encode(ease, forKey: .ease)
+        try c.encode(intervalDays, forKey: .intervalDays)
+        try c.encode(due, forKey: .due)
+        try c.encode(reps, forKey: .reps)
+        try c.encode(lapses, forKey: .lapses)
+        try c.encode(totalHints, forKey: .totalHints)
+        try c.encodeIfPresent(lastGrade, forKey: .lastGrade)
+        try c.encode(updatedAt, forKey: .updatedAt)
     }
 
     static func fresh(verseId: UUID, now: Date = Date()) -> ReviewState {
@@ -88,6 +152,7 @@ struct ReviewState: Codable, Equatable {
     /// they are recorded separately, already net of per-word accidental forgiveness.
     func advanced(with grade: Grade, mistakes: Int, now: Date = Date()) -> ReviewState {
         var r = self
+        r.updatedAt = now
         r.totalHints += mistakes
         r.lastGrade = grade
         switch grade {
@@ -125,12 +190,41 @@ struct ReviewState: Codable, Equatable {
     }
 }
 
-// MARK: - Persistence envelope (also the sync/export format, v1)
+// MARK: - Persistence envelope (also the sync/export format, v1/v2)
+
+/// Tombstone so deletes propagate: without this, merge-as-union would
+/// resurrect a deleted verse on the next pull of an older snapshot.
+struct DeletedEntry: Codable, Equatable {
+    var verseId: UUID
+    var deletedAt: Date
+}
 
 struct LibraryEnvelope: Codable {
+    /// 1 = original (no updatedAt/tombstones), 2 = newer-wins fields.
+    /// Decoders accept either; encoders always write 2.
     var version: Int
     var verses: [Verse]
     var reviews: [ReviewState]
+    var deleted: [DeletedEntry]
+
+    init(version: Int = 2, verses: [Verse], reviews: [ReviewState], deleted: [DeletedEntry] = []) {
+        self.version = version
+        self.verses = verses
+        self.reviews = reviews
+        self.deleted = deleted
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version, verses, reviews, deleted
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        verses = try c.decode([Verse].self, forKey: .verses)
+        reviews = try c.decode([ReviewState].self, forKey: .reviews)
+        deleted = try c.decodeIfPresent([DeletedEntry].self, forKey: .deleted) ?? []
+    }
 }
 
 // MARK: - Encrypted sync envelope (v2, end-to-end encrypted)

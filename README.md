@@ -96,6 +96,7 @@ SM-2-lite (Anki-style): Again resets (10-min retry, ease −0.20, lapse+1); Hard
 - `04-graded.png` — graded Good → next due date, Undo window
 - `05-settings.png` — sync, export/import, about
 - `06-add-verse.png` — Add verse with ESV fetch (ranges like `Psalm 23:1-6` accepted)
+- `09-edit-verse.png` — Verses-tab taps open the editor (reference/text, refetch, delete), never practice
 - `07-range-ref.png` — multi-verse range composed inline with colon + dash
 - `08-long-scroll.png` — 71-word passage auto-followed to the grade card
 

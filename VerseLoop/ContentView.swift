@@ -36,6 +36,9 @@ struct ContentView: View {
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gearshape.fill") }
         }
+        .task {
+            await store.autoPullOnLaunch()
+        }
     }
 }
 
@@ -46,23 +49,27 @@ struct LoopTab: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 12) {
-                header
-                if store.loopQueue.isEmpty {
-                    emptyState
-                } else {
-                    List {
-                        ForEach(store.loopQueue) { verse in
-                            let r = store.review(for: verse.id)
-                            NavigationLink {
-                                ReviewView(verse: verse)
-                            } label: {
-                                VerseRow(verse: verse, review: r)
+            // Live 30s tick: due counts, countdown badges, and queue order
+            // recompute as retry windows elapse — no restart needed.
+            TimelineView(.periodic(from: .now, by: 30)) { _ in
+                VStack(spacing: 12) {
+                    header
+                    if store.loopQueue.isEmpty {
+                        emptyState
+                    } else {
+                        List {
+                            ForEach(store.loopQueue) { verse in
+                                let r = store.review(for: verse.id)
+                                NavigationLink {
+                                    ReviewView(verse: verse)
+                                } label: {
+                                    VerseRow(verse: verse, review: r)
+                                }
                             }
+                            .onDelete(perform: delete)
                         }
-                        .onDelete(perform: delete)
+                        .listStyle(.plain)
                     }
-                    .listStyle(.plain)
                 }
             }
             .navigationTitle("Today's Verses")
@@ -83,7 +90,7 @@ struct LoopTab: View {
         VStack(spacing: 12) {
             Image(systemName: "checkmark.circle.fill").font(.system(size: 56)).foregroundStyle(.green)
             Text("All caught up.").font(.title2).bold()
-            Text("Add a verse in the Verses tab — ESV fetches from Settings key or Worker.").foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal)
+            Text("Add a verse in the Verses tab — ESV text arrives through your Worker.").foregroundStyle(.secondary).multilineTextAlignment(.center).padding(.horizontal)
             Spacer()
         }.padding(.top, 40)
     }
@@ -155,18 +162,23 @@ struct DueBadge: View {
 struct VersesTab: View {
     @EnvironmentObject var store: VerseStore
     @State private var showingAdd = false
+    @State private var editingVerse: Verse?
 
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(store.verses) { verse in
-                    let r = store.review(for: verse.id)
-                    NavigationLink { ReviewView(verse: verse) } label: {
-                        VerseRow(verse: verse, review: r)
+            // Same 30s live tick as the Loop tab: badges stay truthful here too.
+            TimelineView(.periodic(from: .now, by: 30)) { _ in
+                List {
+                    ForEach(store.verses) { verse in
+                        let r = store.review(for: verse.id)
+                        Button { editingVerse = verse } label: {
+                            VerseRow(verse: verse, review: r)
+                        }
+                        .buttonStyle(.plain)
                     }
-                }
-                .onDelete { idx in
-                    for i in idx { store.deleteVerse(store.verses[i]) }
+                    .onDelete { idx in
+                        for i in idx { store.deleteVerse(store.verses[i]) }
+                    }
                 }
             }
             .navigationTitle("Verses")
@@ -174,6 +186,7 @@ struct VersesTab: View {
                 Button { showingAdd = true } label: { Image(systemName: "plus") }
             }
             .sheet(isPresented: $showingAdd) { AddVerseView() }
+            .sheet(item: $editingVerse) { v in AddVerseView(verseToEdit: v) }
         }
     }
 }
@@ -181,11 +194,18 @@ struct VersesTab: View {
 struct AddVerseView: View {
     @EnvironmentObject var store: VerseStore
     @Environment(\.dismiss) var dismiss
-    @State private var reference = ""
-    @State private var text = ""
+    var verseToEdit: Verse?
+    @State private var reference: String
+    @State private var text: String
     @State private var isFetching = false
     @State private var fetchError: String?
     @State private var fetchedESV = false
+
+    init(verseToEdit: Verse? = nil) {
+        self.verseToEdit = verseToEdit
+        _reference = State(initialValue: verseToEdit?.reference ?? "")
+        _text = State(initialValue: verseToEdit?.text ?? "")
+    }
 
     var body: some View {
         NavigationStack {
@@ -208,20 +228,30 @@ struct AddVerseView: View {
                         Text(e).font(.caption).foregroundStyle(.red)
                     }
                 } footer: {
-                    Text("ESV comes from api.esv.org (your key) or your Worker proxy. Get a free key at api.esv.org.")
+                    Text("ESV text is fetched through your Worker (ranges like Psalm 23:1-6 work too).")
                 }
                 Section("Text \(fetchedESV ? "· ESV ✓" : "")") {
                     TextEditor(text: $text).frame(minHeight: 140)
                 }
                 Section {
-                    Button("Save verse") {
-                        store.addVerse(reference: reference, text: text, source: fetchedESV ? "esv" : "manual")
+                    Button(verseToEdit == nil ? "Save verse" : "Save changes") {
+                        if let v = verseToEdit {
+                            store.updateVerse(v, reference: reference, text: text, source: fetchedESV ? "esv" : v.textSource)
+                        } else {
+                            store.addVerse(reference: reference, text: text, source: fetchedESV ? "esv" : "manual")
+                        }
                         dismiss()
                     }
                     .disabled(reference.trimmingCharacters(in: .whitespaces).isEmpty || text.trimmingCharacters(in: .whitespaces).isEmpty)
+                    if verseToEdit != nil {
+                        Button("Delete verse", role: .destructive) {
+                            if let v = verseToEdit { store.deleteVerse(v) }
+                            dismiss()
+                        }
+                    }
                 }
             }
-            .navigationTitle("Add verse")
+            .navigationTitle(verseToEdit == nil ? "Add verse" : "Edit verse")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { Button("Cancel") { dismiss() } }
         }
@@ -253,10 +283,8 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section("Sync (end-to-end encrypted)") {
-                    HStack {
-                        Button { Task { isBusy = true; await store.push(); isBusy = false } } label: { Text("Push") }.disabled(isBusy)
-                        Button { Task { isBusy = true; await store.pull(); isBusy = false } } label: { Text("Pull") }.disabled(isBusy)
-                    }
+                    Toggle("Auto-sync after changes", isOn: $store.autoSyncEnabled)
+                    Button { Task { isBusy = true; await store.push(); isBusy = false } } label: { Text("Synchronize Backup") }.disabled(isBusy)
                     if !store.syncMessage.isEmpty { Text(store.syncMessage).font(.caption).foregroundStyle(.secondary) }
                     if let d = store.lastSyncAt { Text("Last sync: \(d.formatted(date: .abbreviated, time: .shortened))").font(.caption).foregroundStyle(.secondary) }
                 }
