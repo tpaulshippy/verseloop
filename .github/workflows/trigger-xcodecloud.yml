@@ -1,0 +1,46 @@
+name: Trigger Xcode Cloud (frontend only)
+
+# Source-controlled path filter: Xcode Cloud start conditions can't live in
+# git, so the workflow over there must be set to Manual/off (keep a dummy
+# "any branch" start condition — Xcode requires one). This workflow is the
+# real gate: only frontend pushes dispatch a build.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "VerseLoop/**"
+      - "VerseLoop.xcodeproj/**"
+      - "VerseLoopUITests/**"
+      - "ci_scripts/**"
+      - "scripts/**"
+      - ".github/workflows/trigger-xcodecloud.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "VerseLoop/**"
+      - "VerseLoop.xcodeproj/**"
+      - "VerseLoopUITests/**"
+      - "ci_scripts/**"
+      - "scripts/**"
+      - ".github/workflows/trigger-xcodecloud.yml"
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Generate App Store Connect token
+        id: asc
+        uses: yuki0n0/action-appstoreconnect-token@v1.0
+        with:
+          issuer id: ${{ secrets.ASC_ISSUER_ID }}
+          key id: ${{ secrets.ASC_KEY_ID }}
+          key: ${{ secrets.ASC_PRIVATE_KEY }}
+
+      - name: Dispatch Xcode Cloud workflow
+        uses: yorifuji/actions-xcode-cloud-dispatcher@v1
+        with:
+          appstore-connect-token: ${{ steps.asc.outputs.token }}
+          xcode-cloud-workflow-id: ${{ secrets.XCODE_CLOUD_WORKFLOW_ID }}
+          git-branch-name: ${{ github.head_ref || github.ref_name }}

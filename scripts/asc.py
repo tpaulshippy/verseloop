@@ -46,8 +46,16 @@ def call(method, path, body=None):
 
 
 def main():
+    if len(sys.argv) < 2:
+        sys.exit("usage: asc.py apps | create-app | get /v1/path")
     cmd = sys.argv[1]
-    if cmd == "apps":
+    if cmd == "get":
+        # Generic read helper, e.g.:
+        #   asc.py get /v1/ciProducts?filter[productType]=APP
+        #   asc.py get /v1/ciProducts/<productId>/workflows
+        status, out = call("GET", sys.argv[2])
+        print(json.dumps({"status": status, "result": out}, indent=1)[:4000])
+    elif cmd == "apps":
         status, out = call("GET", "/v1/apps?filter[bundleId]=com.tpaulshippy.verseloop&limit=1")
         print(json.dumps({"status": status, "apps": out.get("data", [])}, indent=1))
     elif cmd == "create-app":
