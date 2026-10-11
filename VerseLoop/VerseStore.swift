@@ -58,6 +58,11 @@ final class VerseStore: ObservableObject {
     // server-side only, so neither is user-visible anymore.
     static let workerBaseURL = "https://verseloop.pshippy-245.workers.dev"
 
+    /// Public App Store URLs (served by the Worker, sources in appstore/).
+    static let privacyPolicyURL = URL(string: "https://verseloop.pshippy-245.workers.dev/privacy")!
+    static let supportURL = URL(string: "https://verseloop.pshippy-245.workers.dev/support")!
+    static let dataDeletionURL = URL(string: "https://verseloop.pshippy-245.workers.dev/support#delete-my-data")!
+
     @Published var syncCode: String {
         didSet { UserDefaults.standard.set(syncCode, forKey: "verseloop.synccode") }
     }
@@ -186,6 +191,44 @@ final class VerseStore: ObservableObject {
     }
 
     func clearUndoToast() { undoToast = nil }
+
+    // MARK: - Delete my data (App Store 5.1.1(i): revocation + deletion)
+
+    /// Deletes everything this app holds:
+    /// 1. remote encrypted backup for the current sync code (best effort),
+    /// 2. local verses / reviews / tombstones + persisted JSON,
+    /// 3. rotates the sync code so the old cloud bucket can never be
+    ///    re-linked, and disables auto-sync side effects until new data arrives.
+    /// There are no accounts: this is the full account-deletion equivalent.
+    func deleteAllData() async {
+        let oldCode = syncCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !oldCode.isEmpty {
+            do {
+                let base = Self.workerBaseURL.hasSuffix("/") ? String(Self.workerBaseURL.dropLast()) : Self.workerBaseURL
+                if let url = URL(string: "\(base)/v1/sync/\(oldCode)") {
+                    var req = URLRequest(url: url)
+                    req.httpMethod = "DELETE"
+                    req.timeoutInterval = 15
+                    _ = try? await URLSession.shared.data(for: req)
+                }
+            }
+        }
+        autoSyncTask?.cancel()
+        verses = []
+        reviews = [:]
+        deleted = []
+        gradeUndoStack = []
+        undoToast = nil
+        lastSyncAt = nil
+        try? FileManager.default.removeItem(at: libraryURL)
+        // Persist the empty library so a relaunch stays empty (no demo reseed).
+        save()
+        // Rotate the code so a stale server snapshot can never resurrect data.
+        let fresh = Self.newSyncCode()
+        syncCode = fresh
+        UserDefaults.standard.set(fresh, forKey: "verseloop.synccode")
+        syncMessage = "All data deleted ✓"
+    }
 
     // MARK: - Persistence (local JSON, offline-first)
 

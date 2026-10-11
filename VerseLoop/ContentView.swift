@@ -278,6 +278,8 @@ struct SettingsView: View {
     @State private var pastedJSON = ""
     @State private var exportURL: URL?
     @State private var isBusy = false
+    @State private var showingDeleteConfirm = false
+    @State private var isDeleting = false
 
     var body: some View {
         NavigationStack {
@@ -304,6 +306,53 @@ struct SettingsView: View {
                     Text("VerseLoop · ESV-only memorization with real SM-2 spaced repetition, forgiving first-letter testing, and exportable sync.").font(.caption)
                     Text(ESVService.attribution).font(.caption).foregroundStyle(.secondary)
                     Text("Verses: \(store.verses.count) · Due: \(store.dueCount)").font(.caption).foregroundStyle(.secondary)
+                }
+                Section {
+                    Link(destination: VerseStore.privacyPolicyURL) {
+                        Label("Privacy Policy", systemImage: "hand.raised.fill")
+                    }
+                    .accessibilityIdentifier("privacy-policy-link")
+                    Link(destination: VerseStore.supportURL) {
+                        Label("Support & Help", systemImage: "questionmark.circle.fill")
+                    }
+                    Text("No account. No analytics. No ads. Verses stay on your device; the optional encrypted backup can't be read by the developer.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } header: {
+                    Text("Privacy & Support")
+                } footer: {
+                    Text("Same policy as App Store Connect → Privacy Policy URL.")
+                }
+                Section {
+                    Button(role: .destructive) {
+                        showingDeleteConfirm = true
+                    } label: {
+                        HStack {
+                            if isDeleting { ProgressView() }
+                            Text(isDeleting ? "Deleting…" : "Delete All My Data")
+                        }
+                    }
+                    .disabled(isDeleting || (store.verses.isEmpty && store.reviews.isEmpty))
+                    .accessibilityIdentifier("delete-all-data")
+                    .confirmationDialog(
+                        "Delete everything?",
+                        isPresented: $showingDeleteConfirm,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Delete everything", role: .destructive) {
+                            isDeleting = true
+                            Task {
+                                await store.deleteAllData()
+                                isDeleting = false
+                            }
+                        }
+                        Button("Cancel", role: .cancel) { }
+                    } message: {
+                        Text("Removes all verses, reviews, and history on this device, deletes the encrypted cloud backup for this sync code, and rotates the code. This can't be undone — export first if you want a copy.")
+                    }
+                } header: {
+                    Text("Delete My Data")
+                } footer: {
+                    Text("No account to delete — this is the full equivalent. Also documented at Support → Delete My Data.")
                 }
             }
             .navigationTitle("Settings")
