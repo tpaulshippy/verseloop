@@ -148,6 +148,10 @@ struct ReviewState: Codable, Equatable {
 
     var isDue: Bool { due <= Date() }
 
+    /// Tick-aware variant: pass the TimelineView date so rows recompute
+    /// (and SwiftUI sees new inputs) on every tick. See LoopTab.
+    func isDue(at now: Date) -> Bool { due <= now }
+
     /// Explicit grade -> next state. Typing mistakes never grade implicitly;
     /// they are recorded separately, already net of per-word accidental forgiveness.
     func advanced(with grade: Grade, mistakes: Int, now: Date = Date()) -> ReviewState {

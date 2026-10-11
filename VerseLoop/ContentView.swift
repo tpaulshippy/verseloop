@@ -50,22 +50,27 @@ struct LoopTab: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            // Live 30s tick: due counts, countdown badges, and queue order
-            // recompute as retry windows elapse — no restart needed.
-            TimelineView(.periodic(from: .now, by: 30)) { _ in
+            // Live 30s tick. The tick date is load-bearing: it is threaded
+            // through every row/badge as `now`, so each tick produces NEW
+            // view inputs and SwiftUI actually re-renders the countdowns.
+            // (Discarding the date — `{ _ in }` + `Date()` at render time —
+            // leaves value-identical rows the framework skips, freezing
+            // "in X min" / DUE until something else redraws the list.)
+            TimelineView(.periodic(from: .now, by: 30)) { context in
+                let now = context.date
                 VStack(spacing: 12) {
-                    header
-                    if store.loopQueue.isEmpty {
+                    header(now: now)
+                    if store.loopQueue(at: now).isEmpty {
                         emptyState
                     } else {
                         List {
-                            ForEach(store.loopQueue) { verse in
+                            ForEach(store.loopQueue(at: now)) { verse in
                                 let r = store.review(for: verse.id)
                                 NavigationLink(value: verse) {
-                                    VerseRow(verse: verse, review: r)
+                                    VerseRow(verse: verse, review: r, now: now)
                                 }
                             }
-                            .onDelete(perform: delete)
+                            .onDelete { delete(at: $0, now: now) }
                         }
                         .listStyle(.plain)
                     }
@@ -87,9 +92,10 @@ struct LoopTab: View {
         }
     }
 
-    private var header: some View {
-        HStack(spacing: 16) {
-            StatBubble(title: "Due", value: "\(store.dueCount)", color: store.dueCount > 0 ? .orange : .green)
+    private func header(now: Date) -> some View {
+        let due = store.dueCount(at: now)
+        return HStack(spacing: 16) {
+            StatBubble(title: "Due", value: "\(due)", color: due > 0 ? .orange : .green)
             StatBubble(title: "Total", value: "\(store.verses.count)", color: .blue)
             StatBubble(title: "Mastered", value: "\(store.masteredCount)", color: .purple)
             Spacer()
@@ -106,8 +112,8 @@ struct LoopTab: View {
         }.padding(.top, 40)
     }
 
-    private func delete(at offsets: IndexSet) {
-        let q = store.loopQueue
+    private func delete(at offsets: IndexSet, now: Date) {
+        let q = store.loopQueue(at: now)
         for i in offsets { store.deleteVerse(q[i]) }
     }
 }
@@ -126,12 +132,12 @@ struct StatBubble: View {
 }
 
 struct VerseRow: View {
-    var verse: Verse; var review: ReviewState
+    var verse: Verse; var review: ReviewState; var now: Date
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(verse.reference).font(.headline)
             HStack(spacing: 8) {
-                DueBadge(review: review)
+                DueBadge(review: review, now: now)
                 Text("E\(String(format: "%.2f", review.ease)) · ×\(review.reps)").font(.caption2).foregroundStyle(.secondary)
                 if verse.textSource != "esv" {
                     Text(verse.textSource).font(.caption2).foregroundStyle(.secondary)
@@ -142,9 +148,9 @@ struct VerseRow: View {
 }
 
 struct DueBadge: View {
-    var review: ReviewState
+    var review: ReviewState; var now: Date
     var body: some View {
-        if review.isDue {
+        if review.isDue(at: now) {
             Text("DUE").font(.caption2).bold().padding(.horizontal, 8).padding(.vertical, 3)
                 .background(Color.orange.opacity(0.2), in: Capsule())
                 .foregroundStyle(.orange)
@@ -157,7 +163,7 @@ struct DueBadge: View {
 
     /// Honest relative label. Never "in 0d": a retry minutes away says so.
     private func dueText(_ r: ReviewState) -> String {
-        let mins = Int(r.due.timeIntervalSinceNow / 60)
+        let mins = Int(r.due.timeIntervalSince(now) / 60)
         if mins < 1 { return "moments" }
         if mins < 60 { return "in \(mins) min" }
         let cal = Calendar.current
@@ -177,13 +183,15 @@ struct VersesTab: View {
 
     var body: some View {
         NavigationStack {
-            // Same 30s live tick as the Loop tab: badges stay truthful here too.
-            TimelineView(.periodic(from: .now, by: 30)) { _ in
+            // Same 30s live tick as the Loop tab (tick date threaded as
+            // `now` so badges stay truthful here too — see LoopTab).
+            TimelineView(.periodic(from: .now, by: 30)) { context in
+                let now = context.date
                 List {
                     ForEach(store.verses) { verse in
                         let r = store.review(for: verse.id)
                         Button { editingVerse = verse } label: {
-                            VerseRow(verse: verse, review: r)
+                            VerseRow(verse: verse, review: r, now: now)
                         }
                         .buttonStyle(.plain)
                     }

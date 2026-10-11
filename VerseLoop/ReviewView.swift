@@ -162,13 +162,16 @@ struct ReviewView: View {
     // MARK: header — due state + mistake count only
 
     private var header: some View {
-        HStack {
-            DueBadge(review: store.review(for: verse.id))
-            Text("· \(mistakeText)")
-                .font(.caption).bold(mistakeCount > 0)
-                .foregroundStyle(mistakeCount > 0 ? Color.red : Color.secondary)
-                .accessibilityIdentifier("mistake-count")
-            Spacer()
+        // Own 30s tick so the DUE badge flips live mid-practice too.
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            HStack {
+                DueBadge(review: store.review(for: verse.id), now: context.date)
+                Text("· \(mistakeText)")
+                    .font(.caption).bold(mistakeCount > 0)
+                    .foregroundStyle(mistakeCount > 0 ? Color.red : Color.secondary)
+                    .accessibilityIdentifier("mistake-count")
+                Spacer()
+            }
         }
     }
 

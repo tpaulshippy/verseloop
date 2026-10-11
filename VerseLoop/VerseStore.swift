@@ -191,20 +191,26 @@ final class VerseStore: ObservableObject {
     // MARK: - Queue (the "Loop": one due-sorted pass per day)
 
     /// Due verses first (oldest due at top), then not-yet-due remainder.
-    var loopQueue: [Verse] {
+    /// The `at:` variant takes the TimelineView tick date so the queue
+    /// re-partitions live as retry windows elapse (see LoopTab).
+    var loopQueue: [Verse] { loopQueue(at: Date()) }
+
+    func loopQueue(at now: Date) -> [Verse] {
         verses.sorted { a, b in
             let ra = reviews[a.id] ?? .fresh(verseId: a.id)
             let rb = reviews[b.id] ?? .fresh(verseId: b.id)
-            let aOverdue = ra.due <= Date()
-            let bOverdue = rb.due <= Date()
+            let aOverdue = ra.due <= now
+            let bOverdue = rb.due <= now
             if aOverdue != bOverdue { return aOverdue && !bOverdue }
             if ra.due != rb.due { return ra.due < rb.due }
             return a.addedAt < b.addedAt
         }
     }
 
-    var dueCount: Int {
-        verses.filter { (reviews[$0.id] ?? .fresh(verseId: $0.id)).isDue }.count
+    var dueCount: Int { dueCount(at: Date()) }
+
+    func dueCount(at now: Date) -> Int {
+        verses.filter { (reviews[$0.id] ?? .fresh(verseId: $0.id)).isDue(at: now) }.count
     }
 
     var masteredCount: Int {
