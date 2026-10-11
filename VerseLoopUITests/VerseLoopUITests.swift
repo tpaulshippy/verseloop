@@ -42,7 +42,8 @@ final class VerseLoopUITests: XCTestCase {
         app.launch()
         let field = app.textFields["first-letter-input"]
         XCTAssertTrue(field.waitForExistence(timeout: 10))
-        field.tap()
+        // Keyboard focuses automatically; tapping the header refocuses any time.
+        app.staticTexts["mistake-count"].tap()
 
         // Wrong first letter for "The" -> buzz + mistake count
         field.typeText("X")
@@ -54,11 +55,12 @@ final class VerseLoopUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["· 0 mistakes"].waitForExistence(timeout: 5))
         snap(app, "03-review-forgiven")
 
-        // Type the rest correctly (LORD is my shepherd; I shall not want) —
-        // the stream flows straight into the reference (P + 231, colon skipped)
-        field.tap()
+        // Type the rest correctly (LORD is my shepherd; I shall not want).
+        // The Show button flipping to "Show character" proves the stream
+        // crossed into the reference phase.
+        app.staticTexts["mistake-count"].tap()
         field.typeText("limsisnw")
-        XCTAssertTrue(app.staticTexts["initial, then numbers"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Show character"].waitForExistence(timeout: 10))
         field.tap()
         field.typeText("P231")
         XCTAssertTrue(app.staticTexts["Suggested: Easy — but your grade decides, as always."].waitForExistence(timeout: 10))

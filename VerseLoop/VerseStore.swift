@@ -43,15 +43,13 @@ final class VerseStore: ObservableObject {
     @Published var lastSyncAt: Date?
     @Published var syncMessage: String = ""
 
-    // Settings (UserDefaults so they survive reinstalls of dev builds)
-    @Published var workerBaseURL: String {
-        didSet { UserDefaults.standard.set(workerBaseURL, forKey: "verseloop.worker") }
-    }
+    // Settings (UserDefaults so they survive reinstalls of dev builds).
+    // The Worker URL is fixed (your own deployment); the ESV key lives
+    // server-side only, so neither is user-visible anymore.
+    static let workerBaseURL = "https://verseloop.pshippy-245.workers.dev"
+
     @Published var syncCode: String {
         didSet { UserDefaults.standard.set(syncCode, forKey: "verseloop.synccode") }
-    }
-    @Published var esvAPIKey: String {
-        didSet { UserDefaults.standard.set(esvAPIKey, forKey: "verseloop.esvkey") }
     }
 
     // Undo support for accidental grades
@@ -64,12 +62,10 @@ final class VerseStore: ObservableObject {
     @Published var undoToast: String? // "Graded Good — Undo" with auto-dismiss handled by view
 
     init() {
-        self.workerBaseURL = UserDefaults.standard.string(forKey: "verseloop.worker") ?? ""
         let storedCode = UserDefaults.standard.string(forKey: "verseloop.synccode") ?? ""
         let code = storedCode.isEmpty ? Self.newSyncCode() : storedCode
         self.syncCode = code
         if storedCode.isEmpty { UserDefaults.standard.set(code, forKey: "verseloop.synccode") }
-        self.esvAPIKey = UserDefaults.standard.string(forKey: "verseloop.esvkey") ?? ""
         if !load() { seedDemo() }
     }
 
@@ -84,11 +80,6 @@ final class VerseStore: ObservableObject {
             out.append(ch)
         }
         return out
-    }
-
-    func regenerateSyncCode() {
-        syncCode = Self.newSyncCode() // didSet persists
-        syncMessage = "New code — push to overwrite the server snapshot, then paste on your other device."
     }
 
     // MARK: - Queue (the "Loop": one due-sorted pass per day)
@@ -226,7 +217,7 @@ final class VerseStore: ObservableObject {
     // MARK: - Worker sync (free tier; sync code is the only credential)
 
     private func syncEndpoint(path: String) throws -> URL {
-        let base = workerBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let base = Self.workerBaseURL
         let code = syncCode.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !base.isEmpty else { throw SyncError.noWorker }
         guard !code.isEmpty else { throw SyncError.noCode }
@@ -239,7 +230,7 @@ final class VerseStore: ObservableObject {
         case noWorker, noCode, badURL, server(String)
         var errorDescription: String? {
             switch self {
-            case .noWorker: return "Set a Worker URL in Settings first (see worker/README)."
+            case .noWorker: return "Sync is unavailable in this build."
             case .noCode: return "Pick a sync code in Settings (same code on both devices)."
             case .badURL: return "Worker URL looks wrong."
             case .server(let s): return "Sync failed: \(s)"
@@ -304,6 +295,6 @@ final class VerseStore: ObservableObject {
     }
 
     func esvService() -> ESVService {
-        ESVService(workerBaseURL: workerBaseURL, apiKey: esvAPIKey)
+        ESVService(workerBaseURL: Self.workerBaseURL)
     }
 }

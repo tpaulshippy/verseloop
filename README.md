@@ -18,10 +18,10 @@ Tester: the reference stays **hidden** and no word counts are shown. **Type the 
 
 ## ESV-only, legally
 
-**Only the English Standard Version.** ESV text is © Crossway and is **never bundled in this repo** — not in code, seeds, tests, or recordings fixtures. The app ships with two short public-domain KJV demo verses so the simulator build works offline; real ESV passages are fetched at runtime:
+**Only the English Standard Version.** ESV text is © Crossway and is **never bundled in this repo** — not in code, seeds, tests, or recordings fixtures. The app ships with two short public-domain KJV demo verses so the simulator build works offline; real ESV passages are fetched at runtime through your own Worker, which holds the free api.esv.org key server-side (set once as `ESV_API_TOKEN`, auto-deployed by CI). No key ever lives on-device.
 
 1. Get a free key at https://api.esv.org (an "API Application").
-2. Either paste it in **Settings → ESV API key** (stays on-device), or — better — deploy the Worker below and put the key in `wrangler secret put ESV_API_TOKEN` so devices never hold it. The Worker caches passages 24h (free Cache API) to stay inside ESV quotas.
+2. Set it once as the `ESV_API_TOKEN` repo secret (Settings → Secrets and variables → Actions). The deploy workflow puts it server-side on every deploy. The Worker caches passages 24h (free Cache API) to stay inside ESV quotas.
 
 > Scripture quotations are from the ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission via the ESV API. All rights reserved.
 
@@ -66,7 +66,7 @@ Prereqs: paid Apple Developer membership + the app's bundle ID (`com.tpaulshippy
 2. **Archive**: in Xcode set the VerseLoop target's team, then Product → Archive (Release). Or run `./scripts/archive-testflight.sh` after putting your Team ID in `scripts/ExportOptions.plist`.
 3. **Distribute**: Organizer → Distribute App → TestFlight & App Store → upload. Wait for processing (~10–60 min; you'll get an email).
 4. **Testers**: App Store Connect → your app → TestFlight → add yourself as an **internal tester** (no beta review needed). Install Apple's **TestFlight** app on the SE3, accept the invite.
-5. **First launch on device**: Settings → ESV API key *or* Worker URL, then add verses. The two KJV demo verses work with zero setup.
+5. **First launch on device**: just add verses (ESV fetches through your Worker; the two KJV demo verses work with zero setup).
 
 Every re-upload needs a new build number: bump `CURRENT_PROJECT_VERSION` in the project (1 → 2 → 3…). External testers (other people) require passing Beta App Review first — internal testing does not.
 
@@ -78,7 +78,7 @@ npx wrangler secret put ESV_API_TOKEN   # your api.esv.org key
 npm run deploy                          # -> https://verseloop.<you>.workers.dev
 ```
 
-Paste that URL into the app's **Settings → Worker URL**. Your sync code is generated automatically on first launch — **Copy** it there and paste it on your second device (Universal Clipboard works across your devices). Push on one / Pull on the other. Libraries are end-to-end encrypted (AES-GCM, key derived from the code via HKDF-SHA256), so the Worker only ever stores ciphertext it cannot read. "New code" regenerates (old snapshots become unreachable). No KV binding needed to start (in-memory); add the `SYNC_KV` binding in `wrangler.toml` for durable multi-device sync — still free tier.
+The app points at your Worker URL (baked in at build time) and generates its own sync code on first launch — nothing to configure on-device. Push on one device / Pull on the other to sync. Libraries are end-to-end encrypted (AES-GCM, key derived from the code via HKDF-SHA256), so the Worker only ever stores ciphertext it cannot read. No KV binding needed to start (in-memory); add the `SYNC_KV` binding in `wrangler.toml` for durable multi-device sync — still free tier.
 
 Endpoints: `GET /health` · `GET /v1/esv?q=John+1:1` · `PUT/GET /v1/sync/:code` (256 KB cap).
 

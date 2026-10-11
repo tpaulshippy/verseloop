@@ -122,13 +122,10 @@ struct ReviewView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header
+                hiddenField
                 passage
                 if refStarted { referenceRow }
                 if !done {
-                    inputRow(
-                        prompt: inReference ? "Type the reference" : "Type the first letter",
-                        detail: inReference ? "initial, then numbers" : "of the next word"
-                    )
                     controls
                 }
                 if graded == nil {
@@ -138,6 +135,8 @@ struct ReviewView: View {
                 }
             }
             .padding()
+            .contentShape(Rectangle())
+            .onTapGesture { entryFocused = true }
         }
         .navigationTitle("Type")
         .navigationBarTitleDisplayMode(.inline)
@@ -156,6 +155,7 @@ struct ReviewView: View {
             Text("· \(mistakeText)")
                 .font(.caption).bold(mistakeCount > 0)
                 .foregroundStyle(mistakeCount > 0 ? Color.red : Color.secondary)
+                .accessibilityIdentifier("mistake-count")
             Spacer()
         }
     }
@@ -250,42 +250,45 @@ struct ReviewView: View {
             : (mistakes.contains(i) ? "Accidental, tap to unmark" : label))
     }
 
-    // MARK: input
+    // MARK: input — invisible capture field; the keyboard is the UI.
+    // Tapping anywhere refocuses (see the VStack tap gesture).
 
-    private func inputRow(prompt: String, detail: String) -> some View {
-        HStack(spacing: 12) {
-            TextField("first letter…", text: $entry)
-                .accessibilityIdentifier("first-letter-input")
-                .font(.system(.title2, design: .rounded).bold())
-                .multilineTextAlignment(.center)
-                .frame(width: 120)
-                .padding(.vertical, 10)
-                .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-                .keyboardType(.asciiCapable)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .focused($entryFocused)
-                .onChange(of: entry) { _, new in processInput(new) }
-                .onSubmit { entry = "" }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(prompt).font(.subheadline)
-                Text(detail).font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-        }
+    private var hiddenField: some View {
+        TextField("", text: $entry)
+            .accessibilityIdentifier("first-letter-input")
+            .keyboardType(.asciiCapable)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .focused($entryFocused)
+            .onChange(of: entry) { _, new in processInput(new) }
+            .onSubmit { entry = "" }
+            .frame(width: 1, height: 1)
+            .opacity(0.01)
     }
 
     private var controls: some View {
-        HStack(spacing: 10) {
-            Button(inReference ? "Show character" : "Show word") {
+        HStack(spacing: 12) {
+            Button {
                 // A shown item is a miss — forgivable like any other mistake.
                 mistakes.insert(idx)
                 revealed.insert(idx)
                 advance()
+                entryFocused = true
+            } label: {
+                Label(inReference ? "Show character" : "Show word",
+                      systemImage: "questionmark.circle.fill")
+                    .labelStyle(.iconOnly)
+                    .font(.title2)
             }
             .buttonStyle(.bordered)
-            Button("Restart") { reset() }
-                .buttonStyle(.bordered)
+            Button {
+                reset()
+            } label: {
+                Label("Restart", systemImage: "arrow.counterclockwise")
+                    .labelStyle(.iconOnly)
+                    .font(.title2)
+            }
+            .buttonStyle(.bordered)
         }
     }
 
