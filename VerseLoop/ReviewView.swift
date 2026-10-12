@@ -64,6 +64,10 @@ struct ReviewView: View {
     @State private var entry = ""
     @FocusState private var entryFocused: Bool
     @State private var graded: Grade?
+    // Next-verse transition: tap Next -> preview modal names the upcoming
+    // reference, Start -> navigate to a blank practice screen.
+    @State private var showingNextPreview = false
+    @State private var previewVerse: Verse?
     @Environment(\.dismiss) var dismiss
 
     private var words: [String] { verse.words }
@@ -157,6 +161,11 @@ struct ReviewView: View {
             forgiveLatestMistake()
         }
         .onAppear { entryFocused = true }
+        // Defensive reset: if SwiftUI ever reuses this view slot for a
+        // different verse (e.g. missing .id upstream), clear typing state
+        // so the next verse always starts blank.
+        .onChange(of: verse.id) { _, _ in reset() }
+        .sheet(isPresented: $showingNextPreview) { nextPreviewSheet }
     }
 
     // MARK: header — due state + mistake count only
@@ -361,14 +370,54 @@ struct ReviewView: View {
                 .buttonStyle(.bordered)
             }
             // Next due verse if one is waiting, otherwise Done back to Today.
-            Button(nextDue != nil ? "Next →" : "Done") { advanceToNext() }
-                .buttonStyle(.borderedProminent)
-                .frame(maxWidth: .infinity)
+            // Next shows a preview modal first so the upcoming reference is
+            // known, then Start navigates to a blank practice screen.
+            Button(nextDue != nil ? "Next →" : "Done") {
+                if let next = nextDue {
+                    previewVerse = next
+                    showingNextPreview = true
+                } else {
+                    advanceToNext()
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .frame(maxWidth: .infinity)
         }
         .task {
             try? await Task.sleep(nanoseconds: 8_000_000_000)
             store.clearUndoToast()
         }
+    }
+
+    /// Transition modal: names the upcoming verse briefly, then Start
+    /// navigates to a fully reset (blank) practice screen.
+    private var nextPreviewSheet: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                Text("Up next")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("next-preview-title")
+                Text(previewVerse?.reference ?? nextDue?.reference ?? "")
+                    .font(.title2).bold().multilineTextAlignment(.center)
+                    .accessibilityIdentifier("next-preview-reference")
+                Text("Get ready to type the first letter.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Button("Start →") {
+                    showingNextPreview = false
+                    // Defer navigation one tick so the sheet dismisses first;
+                    // the destination mounts fresh (.id + onChange reset).
+                    DispatchQueue.main.async { advanceToNext() }
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("next-preview-start")
+                Spacer()
+            }
+            .padding(.top, 32)
+            .padding(.horizontal)
+            .navigationTitle("Next verse")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.medium])
     }
 
     /// The next due verse after this one (nil when all caught up).
@@ -378,6 +427,14 @@ struct ReviewView: View {
     }
 
     private func advanceToNext() {
+        // Prefer the previewed verse so Start lands exactly where the modal
+        // promised, even if the queue shifted in between.
+        if let preview = previewVerse, preview.id != verse.id {
+            previewVerse = nil
+            if let onNext { onNext(preview) } else { dismiss() }
+            return
+        }
+        previewVerse = nil
         if let next = store.nextDueVerse(excluding: verse.id) {
             if let onNext { onNext(next) } else { dismiss() }
         } else {
@@ -472,6 +529,8 @@ struct ReviewView: View {
         forgiven = []
         entry = ""
         graded = nil
+        previewVerse = nil
+        showingNextPreview = false
         entryFocused = true
     }
 

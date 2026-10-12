@@ -88,6 +88,10 @@ struct LoopTab: View {
                     },
                     onDone: { path = NavigationPath() }
                 )
+                // New identity per verse: without this SwiftUI reuses the
+                // same ReviewView state slot when Next swaps verse A for
+                // verse B, leaking revealed words + mistakes into B.
+                .id(verse.id)
             }
             // A tapped due-reminder jumps straight into that verse — warm
             // (onChange) and cold start (.task on first appear) alike.
