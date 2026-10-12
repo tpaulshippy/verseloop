@@ -36,7 +36,7 @@ struct FlowLayout: Layout {
     }
 }
 
-/// Type-the-first-letter tester (matches the Versify "Type" flow):
+/// Type-the-first-letter tester:
 /// - the REFERENCE IS HIDDEN and no counts are shown
 /// - one seamless stream: type each word's first letter, then — without
 ///   breaking stride — the book initial and the numbers (colon skipped).
