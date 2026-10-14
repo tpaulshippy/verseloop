@@ -160,7 +160,7 @@ struct ReviewView: View {
         .onReceive(NotificationCenter.default.publisher(for: .deviceDidShake)) { _ in
             forgiveLatestMistake()
         }
-        .onAppear { entryFocused = true }
+        .onAppear { requestEntryFocus() }
         // Defensive reset: if SwiftUI ever reuses this view slot for a
         // different verse (e.g. missing .id upstream), clear typing state
         // so the next verse always starts blank.
@@ -286,7 +286,11 @@ struct ReviewView: View {
     private var hiddenField: some View {
         TextField("", text: $entry)
             .accessibilityIdentifier("first-letter-input")
-            .keyboardType(.asciiCapable)
+            // .default is load-bearing: .asciiCapable forces the system
+            // keyboard (third-party keyboards that don't declare ASCII
+            // support get swapped out). Input is filtered in processInput,
+            // so any layout works.
+            .keyboardType(.default)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .focused($entryFocused)
@@ -404,9 +408,10 @@ struct ReviewView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 Button("Start →") {
                     showingNextPreview = false
-                    // Defer navigation one tick so the sheet dismisses first;
-                    // the destination mounts fresh (.id + onChange reset).
-                    DispatchQueue.main.async { advanceToNext() }
+                    // Wait for the sheet dismissal to finish before pushing
+                    // the next verse: navigating mid-dismissal steals first
+                    // responder, so the keyboard never opens (extra tap).
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { advanceToNext() }
                 }
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier("next-preview-start")
@@ -532,6 +537,21 @@ struct ReviewView: View {
         previewVerse = nil
         showingNextPreview = false
         entryFocused = true
+    }
+
+    /// Focus the hidden capture field so the keyboard opens without an
+    /// extra tap. The retry is load-bearing: when arriving via the
+    /// Next-preview sheet, the first request fires mid-transition
+    /// (sheet dismissal + push) and iOS drops it.
+    private func requestEntryFocus() {
+        entryFocused = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            // New verse always starts blank on the typing pass; safe to
+            // reclaim focus if the transition stole it.
+            if !done && graded == nil {
+                entryFocused = true
+            }
+        }
     }
 
     private func grade(_ g: Grade) {
