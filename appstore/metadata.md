@@ -92,8 +92,8 @@ bible,esv,scripture,memory,memorize,verses,spaced,repetition
 - Contact: https://github.com/tpaulshippy/verseloop/issues
 
 ## Version / Build
-- Marketing version: 1.0 (CFBundleShortVersionString)
-- Build: 3 (CFBundleVersion, bumped from 2 for this submission — every upload needs a new build number)
+- Marketing version: 1.0.1 (CFBundleShortVersionString, via `$(MARKETING_VERSION)` — 1.0 train is closed/approved, so all new uploads must be > 1.0)
+- Build: stamped by Xcode Cloud from `CI_BUILD_NUMBER` (`ci_pre_xcodebuild.sh` writes `CURRENT_PROJECT_VERSION`; `Info.plist` reads `$(CURRENT_PROJECT_VERSION)` — do not hand-bump for cloud builds)
 - Deployment target: iOS 17.0. Devices: iPhone only.
 
 ## Release
