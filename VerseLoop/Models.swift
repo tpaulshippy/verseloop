@@ -146,6 +146,28 @@ struct ReviewState: Codable, Equatable {
         ReviewState(verseId: verseId, ease: 2.5, intervalDays: 0, due: now, reps: 0, lapses: 0, totalHints: 0, lastGrade: nil)
     }
 
+    /// Human-friendly stability stage. Drives the list subtitle so raw
+    /// SM-2 ease never leaks into the default UI.
+    var stageLabel: String {
+        if reps >= 5 && intervalDays >= 21 { return "Stable" }
+        if intervalDays >= 7 { return "Growing" }
+        if reps <= 1 { return "New" }
+        return "Learning"
+    }
+
+    /// Default list subtitle: "Learning · every 3d" (stage only when new).
+    var friendlySchedule: String {
+        if intervalDays < 1 { return stageLabel }
+        return "\(stageLabel) · every \(intervalDays)d"
+    }
+
+    /// Debug list subtitle behind Settings → Show scheduler details.
+    var detailedSchedule: String {
+        let base = "E\(String(format: "%.2f", ease)) · ×\(reps)"
+        if intervalDays < 1 { return base }
+        return "\(base) · every \(intervalDays)d"
+    }
+
     var isDue: Bool { due <= Date() }
 
     /// Tick-aware variant: pass the TimelineView date so rows recompute

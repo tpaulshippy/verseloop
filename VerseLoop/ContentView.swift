@@ -67,7 +67,7 @@ struct LoopTab: View {
                             ForEach(store.loopQueue(at: now)) { verse in
                                 let r = store.review(for: verse.id)
                                 NavigationLink(value: verse) {
-                                    VerseRow(verse: verse, review: r, now: now)
+                                    VerseRow(verse: verse, review: r, now: now, showDetails: store.showSchedulerDetails)
                                 }
                             }
                             .onDelete { delete(at: $0, now: now) }
@@ -147,13 +147,13 @@ struct StatBubble: View {
 }
 
 struct VerseRow: View {
-    var verse: Verse; var review: ReviewState; var now: Date
+    var verse: Verse; var review: ReviewState; var now: Date; var showDetails: Bool = false
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(verse.reference).font(.headline)
             HStack(spacing: 8) {
                 DueBadge(review: review, now: now)
-                Text("E\(String(format: "%.2f", review.ease)) · ×\(review.reps)").font(.caption2).foregroundStyle(.secondary)
+                Text(showDetails ? review.detailedSchedule : review.friendlySchedule).font(.caption2).foregroundStyle(.secondary)
                 if verse.textSource != "esv" {
                     Text(verse.textSource).font(.caption2).foregroundStyle(.secondary)
                 }
@@ -206,7 +206,7 @@ struct VersesTab: View {
                     ForEach(store.verses) { verse in
                         let r = store.review(for: verse.id)
                         Button { editingVerse = verse } label: {
-                            VerseRow(verse: verse, review: r, now: now)
+                            VerseRow(verse: verse, review: r, now: now, showDetails: store.showSchedulerDetails)
                         }
                         .buttonStyle(.plain)
                     }
@@ -364,6 +364,13 @@ struct SettingsView: View {
                     Text("Grading suggestions")
                 } footer: {
                     Text("After a typing pass, 0 mistakes suggests Easy; a mistake rate at or under Good suggests Good, at or under Hard suggests Hard, above that Again — net of forgiven mistakes.")
+                }
+                Section {
+                    Toggle("Show scheduler details", isOn: $store.showSchedulerDetails)
+                } header: {
+                    Text("Display")
+                } footer: {
+                    Text("Off shows stage + interval (Learning · every 3d). On shows SM-2 internals (E1.65 · ×4).")
                 }
                 Section("Export / Import (your data is yours)") {
                     Button("Prepare JSON export") {

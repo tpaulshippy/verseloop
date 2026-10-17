@@ -115,6 +115,14 @@ final class VerseStore: ObservableObject {
     static let defaultGoodThreshold = 0.05
     static let defaultHardThreshold = 0.15
 
+    /// When true, list rows show raw SM-2 internals (E2.50 · ×4).
+    /// Default false: rows show "Learning · every 3d".
+    @Published var showSchedulerDetails: Bool = false {
+        didSet {
+            UserDefaults.standard.set(showSchedulerDetails, forKey: "verseloop.showSchedulerDetails")
+        }
+    }
+
     // MARK: - Reminders (local notifications, no server involved)
 
     /// .immediate fires right when each verse's retry window arrives;
@@ -199,6 +207,7 @@ final class VerseStore: ObservableObject {
         self.goodThreshold = good ?? Self.defaultGoodThreshold
         self.hardThreshold = hard ?? Self.defaultHardThreshold
         if self.hardThreshold < self.goodThreshold { self.hardThreshold = self.goodThreshold }
+        self.showSchedulerDetails = UserDefaults.standard.bool(forKey: "verseloop.showSchedulerDetails")
         self.remindersEnabled = UserDefaults.standard.bool(forKey: "verseloop.remindersEnabled")
         if let raw = UserDefaults.standard.string(forKey: "verseloop.reminderMode"),
            let m = ReminderMode(rawValue: raw) {
