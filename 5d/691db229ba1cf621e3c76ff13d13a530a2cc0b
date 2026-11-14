@@ -1,0 +1,16 @@
+.gitignore
+  h_6bbd00fe0a456a 6-8
+VerseLoop.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+  h_6bbd00fe0a456a 1-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5d691db229ba1cf621e3c76ff13d13a530a2cc0b",
+  "prompts": {},
+  "humans": {
+    "h_6bbd00fe0a456a": {
+      "author": "Paul Shippy <pshippy@gmail.com>"
+    }
+  }
+}
