@@ -1,0 +1,34 @@
+.gitignore
+  h_6bbd00fe0a456a 6
+AGENTS.md
+  h_6bbd00fe0a456a 10,55
+VerseLoop.xcodeproj/project.pbxproj
+  h_6bbd00fe0a456a 123,168-170,225-232
+VerseLoop/ContentView.swift
+  h_6bbd00fe0a456a 396,404
+VerseLoop/Models.swift
+  h_6bbd00fe0a456a 2,83,85-91,93-94,104-121,123-126,153-158,164,167,179,198-200,216,259-261,264-265,274-280,282-315,317-326,328-335,337-347,355,359,363-378,380-382,464,475-477,484-488,490,496,500,510-520
+VerseLoop/ReviewView.swift
+  h_6bbd00fe0a456a 367
+VerseLoop/VerseStore.swift
+  h_6bbd00fe0a456a 83-87,147-149,351-354,375,388-390,509,526-551,559,568,572-574,590,597,613,675,689-692,697,705,715-719,736,750-752,754,799-805,807-808,816-817,820,824-825
+VerseLoopUITests/VerseLoopUITests.swift
+  h_6bbd00fe0a456a 69
+appstore/metadata.md
+  h_6bbd00fe0a456a 41
+appstore/privacy-policy.html
+  h_6bbd00fe0a456a 36
+scripts/generate-screenshots.py
+  h_6bbd00fe0a456a 46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "504ff4185299bc58673118354459332e32e93b84",
+  "prompts": {},
+  "humans": {
+    "h_6bbd00fe0a456a": {
+      "author": "Paul Shippy <pshippy@gmail.com>"
+    }
+  }
+}
