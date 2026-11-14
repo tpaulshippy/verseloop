@@ -66,6 +66,7 @@ final class VerseLoopUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Suggested: Easy — but your grade decides, as always."].waitForExistence(timeout: 10))
 
         // Grade buttons carry live FSRS interval previews (~10m / Nd).
+        XCTAssertTrue(app.staticTexts["~10m"].waitForExistence(timeout: 5))
         snap(app, "04-grade-previews")
 
         // Grade, undo the grade, re-grade, advance

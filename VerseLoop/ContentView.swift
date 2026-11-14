@@ -393,6 +393,7 @@ struct SettingsView: View {
                             .bold()
                             .monospacedDigit()
                     }
+                    .accessibilityHidden(true)
                     Slider(
                         value: Binding(
                             get: { store.desiredRetention },
@@ -400,7 +401,7 @@ struct SettingsView: View {
                         ),
                         in: VerseStore.minRetention...VerseStore.maxRetention,
                         step: 0.01
-                    )
+                    ) { Text("Want to remember") }
                     .accessibilityIdentifier("retention-slider")
                     HStack(spacing: 8) {
                         retentionPreset(title: "Relaxed 85%", value: 0.85)

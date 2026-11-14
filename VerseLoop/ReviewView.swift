@@ -364,6 +364,7 @@ struct ReviewView: View {
                     // Explicit label keeps the UI-test hook (buttons["Good"])
                     // stable now that the button carries a preview subtitle.
                     .accessibilityLabel(g.title)
+                    .accessibilityHint((previews[g] ?? 0) <= 0 ? "Reviews in ~10 minutes" : "Reviews in \(previews[g] ?? 0)d")
                 }
             }
         }

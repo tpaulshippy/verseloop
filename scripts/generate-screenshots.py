@@ -43,7 +43,7 @@ SHOTS = [
     ("03-review-forgiven.png", "Forgive slips", "Tap red to mark accidental",
      "Fat-finger? Tap any red word. Shake forgives the latest."),
     ("04-graded.png", "Grade honestly", "FSRS intervals + 8s Undo",
-     "Again / Hard / Good / Easy drives ease and intervals."),
+     "Again / Hard / Good / Easy drives stability and intervals."),
     ("06-add-verse.png", "Add any passage", "ESV fetch built in",
      "Ranges like Psalm 23:1-6 work. ESV fills in automatically."),
     ("05-settings.png", "Yours, truly", "Encrypted backup · Delete anytime",

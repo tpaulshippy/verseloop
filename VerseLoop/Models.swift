@@ -1,4 +1,5 @@
 import Foundation
+import FSRS
 
 // MARK: - Verse
 
@@ -79,20 +80,18 @@ enum Grade: String, CaseIterable, Codable {
     }
 }
 
-// MARK: - FSRS core (compact FSRS-inspired scheduler, zero dependencies)
+// MARK: - FSRS core (real scheduler via the swift-fsrs package, zero other deps)
 //
-// Replaces SM-2-lite. This is an FSRS-6-*inspired* core written inline so
-// the app keeps its zero-dependency guardrail (no swift-fsrs package).
-// The constants below are plausible FSRS-6-style DEFAULT weights, not
-// fitted to any user data; a per-user optimizer is deferred. Examples use
-// invented strings only — never ESV text.
+// Scheduling math lives in the `swift-fsrs` package (FSRS-6 default weights);
+// this enum is a thin adapter that owns our product pins. Per call we build a
+// transient library Card from our stored fields, run it through a freshly
+// constructed `FSRS` instance, and write the resulting memory state back.
+// This structurally resolves the earlier review finding that our old inline
+// interval formula did not invert the forgetting curve — the inversion now
+// happens inside the library (`nextInterval` scaling by `intervalModifier`).
 //
-// KEY lapse guarantee: a lapse on a mature card does NOT nuke stability.
-// Again multiplies stability by 0.25 (floor 0.1d), and a lapse on a card
-// with stability >= 7d schedules max(1, round(S_new * 0.15)) >= 1 day —
-// never the old 10-minute reset. E.g. S=30d, Again -> S=7.5d ->
-// interval = max(1, round(7.5 * 0.15)) = 1d. Young lapses (S < 7d) retry same-day
-// (interval 0, due +10min) as before.
+// Short-term scheduling is disabled: minute-scale learning/relearning steps
+// would bypass our pinned same-day-retry (~10m) and end-of-day normalization.
 
 enum FSRSCore {
     /// Desired retention (probability of recall at due time). 0.9 default.
@@ -101,107 +100,31 @@ enum FSRSCore {
     static let maxIntervalDays: Int = 365
     /// Stability at/above which a lapse still schedules >= 1 day out.
     static let matureThresholdDays: Double = 7
-    /// Mature-lapse interval = max(1, round(nextStability * fraction)).
-    /// S=30d -> nextS=7.5d -> 1d (never the 10-min nuke).
 
-    // MARK: Forgetting-curve constants (FSRS-6 standard)
+    /// Per-call scheduler at the requested retention. Constructed fresh per
+    /// grade/preview so `requestRetention` always applies; the instance is an
+    /// immutable value-style config wrapper, so this is cheap.
+    /// `enableFuzz: false` keeps scheduling deterministic so the grade-button
+    /// previews can never disagree with the applied grade.
+    static func makeScheduler(retention: Double = defaultRetention) -> FSRS {
+        FSRS(parameters: FSRSParameters(
+            requestRetention: retention,
+            maximumInterval: Double(maxIntervalDays),
+            w: FSRSDefaults.defaultWv6,
+            enableFuzz: false,
+            enableShortTerm: false
+        ))
+    }
 
-    /// FACTOR = 0.9^(1/-0.5) - 1 ≈ 0.2348, DECAY = -0.5.
-    static let forgettingFactor: Double = 0.2348
-    static let forgettingDecay: Double = -0.5
-
-    // MARK: Stability-growth weights (FSRS-6-style defaults)
-
-    static let w8: Double = 1.2
-    static let w9: Double = 0.3
-    static let w10: Double = 2.0
-    /// Grade multiplier on the growth term: Hard grows slower…
-    static let wHard: Double = 0.8
-    /// …Easy grows faster (spec: Easy gets an extra ~1.3x).
-    static let wEasy: Double = 1.3
-    /// Hard recall still grows stability modestly even when the curve term ~0.
-    static let hardMinGrowth: Double = 1.15
-
-    /// New-card initial stability (days at 90% retention) per grade.
-    static func initialStability(for grade: Grade) -> Double {
+    /// Our explicit grades map 1:1 onto library ratings (never `.manual` —
+    /// every review here is an explicit user grade).
+    static func rating(for grade: Grade) -> Rating {
         switch grade {
-        case .again: return 0.3
-        case .hard: return 0.8
-        case .good: return 2.0
-        case .easy: return 4.5
+        case .again: return .again
+        case .hard: return .hard
+        case .good: return .good
+        case .easy: return .easy
         }
-    }
-
-    /// New-card initial difficulty (1...10) per grade.
-    static func initialDifficulty(for grade: Grade) -> Double {
-        switch grade {
-        case .again: return 7.0
-        case .hard: return 6.0
-        case .good: return 5.0
-        case .easy: return 4.0
-        }
-    }
-
-    /// R(t, S) = (1 + FACTOR * t / S)^DECAY — recall probability t days
-    /// after a review that left stability S (days).
-    static func forgettingCurve(elapsedDays t: Double, stability s: Double) -> Double {
-        let sSafe = max(s, 0.01)
-        let tSafe = max(t, 0)
-        return pow(1 + forgettingFactor * tSafe / sSafe, forgettingDecay)
-    }
-
-    /// Linear-damping difficulty update, clamped 1...10.
-    /// Again +1.2, Hard +0.3, Good -0.2, Easy -0.8.
-    static func nextDifficulty(difficulty: Double, grade: Grade) -> Double {
-        let delta: Double
-        switch grade {
-        case .again: delta = 1.2
-        case .hard: delta = 0.3
-        case .good: delta = -0.2
-        case .easy: delta = -0.8
-        }
-        return min(10, max(1, difficulty + delta))
-    }
-
-    /// Next stability S' (days) after a recall with retrievability R.
-    ///
-    /// Success: S' = S * (1 + exp(w8) * (11-D) * S^-w9 * (exp((1-R)*w10)-1)
-    ///   * gradeMultiplier), gradeMultiplier = wHard (Hard), wEasy (Easy),
-    ///   1.0 (Good). Hard additionally floors at S * 1.15 so a hard-won
-    ///   recall always grows stability a little.
-    /// Lapse (Again): S' = max(0.1, S * 0.25) — a proportional cut, never
-    ///   a reset to ~0. S=30d -> 7.5d, so the next interval stays >= 1d.
-    static func nextStability(stability: Double, difficulty: Double, retrievability: Double, grade: Grade) -> Double {
-        let s = max(stability, 0.01)
-        guard grade != .again else { return max(0.1, s * 0.25) }
-        let r = min(max(retrievability, 0.01), 0.999)
-        let d = min(max(difficulty, 1), 10)
-        let curveTerm = exp(w8) * (11 - d) * pow(s, -w9) * (exp((1 - r) * w10) - 1)
-        let multiplier: Double
-        switch grade {
-        case .hard: multiplier = wHard
-        case .easy: multiplier = wEasy
-        default: multiplier = 1.0
-        }
-        var grown = s * (1 + max(0, curveTerm) * multiplier)
-        if grade == .hard { grown = max(grown, s * hardMinGrowth) }
-        if grade == .easy { grown = max(grown, s * wEasy) }
-        return max(0.1, grown)
-    }
-
-    /// Days until retrievability decays to `retention`:
-    ///   I = max(1, round(S * ln(retention) / ln(0.9))).
-    /// At retention 0.9 the interval equals stability exactly; higher
-    /// retention shortens it. Capped at maxIntervalDays (365d).
-    ///
-    /// Lapse routing lives in ReviewState.advanced (which knows the grade
-    /// and maturity): mature lapses (S >= 7d) -> max(1, round(S_new * 0.15));
-    /// young lapses -> 0 (retry today, due +10min as before).
-    static func nextInterval(stability: Double, retention: Double = defaultRetention) -> Int {
-        let s = max(stability, 0.01)
-        let ret = min(max(retention, 0.5), 0.999)
-        let days = (s * log(ret) / log(0.9)).rounded()
-        return min(maxIntervalDays, max(1, Int(days)))
     }
 }
 
@@ -227,15 +150,21 @@ struct ReviewState: Codable, Equatable {
     var stability: Double?
     /// FSRS difficulty 1...10 (nil for never-reviewed / pre-FSRS).
     var difficulty: Double?
+    /// Last explicit grade time. Drives library elapsed time (the scheduler
+    /// counts whole UTC calendar days from this date); nil for never-reviewed
+    /// or pre-lastReview records, which fall back to `updatedAt`.
+    ///
+    /// UNDO CONTRACT: undoLastGrade() must restore previous.lastReview verbatim (never now), or elapsed time restarts.
+    var lastReview: Date?
 
     private enum CodingKeys: String, CodingKey {
         case verseId, ease, intervalDays, due, reps, lapses, lastGrade
         case totalHints = "totalPeeks" // v1 key kept so existing libraries still decode
         case updatedAt
-        case stability, difficulty
+        case stability, difficulty, lastReview
     }
 
-    init(verseId: UUID, ease: Double, intervalDays: Int, due: Date, reps: Int, lapses: Int, totalHints: Int, lastGrade: Grade?, updatedAt: Date? = nil, stability: Double? = nil, difficulty: Double? = nil) {
+    init(verseId: UUID, ease: Double, intervalDays: Int, due: Date, reps: Int, lapses: Int, totalHints: Int, lastGrade: Grade?, updatedAt: Date? = nil, stability: Double? = nil, difficulty: Double? = nil, lastReview: Date? = nil) {
         self.verseId = verseId
         self.ease = ease
         self.intervalDays = intervalDays
@@ -247,6 +176,7 @@ struct ReviewState: Codable, Equatable {
         self.updatedAt = updatedAt ?? Date()
         self.stability = stability
         self.difficulty = difficulty
+        self.lastReview = lastReview
     }
 
     init(from decoder: Decoder) throws {
@@ -265,6 +195,9 @@ struct ReviewState: Codable, Equatable {
         // Pre-FSRS records carry no S/D — nil so the next grade initializes.
         stability = try c.decodeIfPresent(Double.self, forKey: .stability)
         difficulty = try c.decodeIfPresent(Double.self, forKey: .difficulty)
+        // Pre-lastReview records carry no explicit grade time — nil so elapsed
+        // time falls back to updatedAt until the next explicit grade sets it.
+        lastReview = try c.decodeIfPresent(Date.self, forKey: .lastReview)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -280,6 +213,7 @@ struct ReviewState: Codable, Equatable {
         try c.encode(updatedAt, forKey: .updatedAt)
         try c.encodeIfPresent(stability, forKey: .stability)
         try c.encodeIfPresent(difficulty, forKey: .difficulty)
+        try c.encodeIfPresent(lastReview, forKey: .lastReview)
     }
 
     static func fresh(verseId: UUID, now: Date = Date()) -> ReviewState {
@@ -322,12 +256,13 @@ struct ReviewState: Codable, Equatable {
     func isDue(at now: Date) -> Bool { due <= now }
 
     /// Current retrievability R (probability of recall right now), or nil
-    /// when never reviewed (no stability yet).
+    /// when never reviewed (no stability yet). Delegates to the library's
+    /// `getRetrievability`; `retention` is kept for signature compatibility
+    /// (retrievability itself is retention-independent).
     func retrievability(at now: Date = Date(), retention: Double = FSRSCore.defaultRetention) -> Double? {
-        guard let s = stability else { return nil }
-        let elapsed = max(0, now.timeIntervalSince(updatedAt) / 86400)
         _ = retention
-        return FSRSCore.forgettingCurve(elapsedDays: elapsed, stability: s)
+        guard stability != nil else { return nil }
+        return FSRSCore.makeScheduler().getRetrievability(card: transientLibraryCard(), now: now).number
     }
 
     /// Interval (days) each grade would schedule from this state, without
@@ -336,26 +271,80 @@ struct ReviewState: Codable, Equatable {
         Grade.allCases.map { grade in (grade, hypotheticalInterval(for: grade, retention: retention, now: now)) }
     }
 
+    /// Transient library Card rebuilt from our stored fields on every call —
+    /// the library is stateless, so this is the only handoff. Reviewed cards
+    /// (stability + difficulty present) resume as `.review` with elapsed time
+    /// counted from `lastReview` (falling back to `updatedAt` for records
+    /// written before `lastReview` existed); never-reviewed and pre-FSRS
+    /// records enter as `.new` so the library initializes S/D from scratch.
+    private func transientLibraryCard() -> Card {
+        if let s = stability, let d = difficulty {
+            return Card(
+                due: due,
+                stability: s,
+                difficulty: d,
+                scheduledDays: Double(intervalDays),
+                reps: reps,
+                lapses: lapses,
+                state: .review,
+                lastReview: lastReview ?? updatedAt
+            )
+        }
+        return Card(due: due, state: .new, lastReview: nil)
+    }
+
+    /// One private hypothetical path shared by `previewIntervals` and
+    /// `advanced` so previews can never drift from the applied grade. Runs
+    /// the transient card through the library, then applies the pinned
+    /// product clamps: Again on a young card -> 0 (~10m retry); Again on a
+    /// mature card -> 1 (intentional product clamp, not the raw library
+    /// value); Hard/Good/Easy -> library days clamped to 1...maxIntervalDays.
+    private struct HypotheticalOutcome {
+        var intervalDays: Int
+        var stability: Double?
+        var difficulty: Double?
+    }
+
+    private func hypotheticalOutcome(for grade: Grade, retention: Double, now: Date) -> HypotheticalOutcome {
+        // Pre-FSRS cards carry stability == nil, so the intervalDays leg must
+        // route them: a 30d-interval card with nil stability is mature.
+        let wasMature = (stability ?? Double(intervalDays)) >= FSRSCore.matureThresholdDays
+            || intervalDays >= 7
+        let scheduler = FSRSCore.makeScheduler(retention: retention)
+        if let item = try? scheduler.next(card: transientLibraryCard(), now: now, grade: FSRSCore.rating(for: grade)) {
+            let lib = item.card
+            if grade == .again {
+                // Intentional product clamp: young lapses retry today (0 keeps
+                // the due-+10min / "~10m" preview behavior); mature lapses
+                // schedule exactly 1 day out (due end-of-day tomorrow) instead
+                // of the old 10-minute reset. This is the fix for the reported
+                // mature-lapse 10-minute-reset bug.
+                return HypotheticalOutcome(
+                    intervalDays: wasMature ? 1 : 0,
+                    stability: lib.stability,
+                    difficulty: lib.difficulty
+                )
+            }
+            let days = min(FSRSCore.maxIntervalDays, max(1, Int(lib.scheduledDays.rounded())))
+            return HypotheticalOutcome(intervalDays: days, stability: lib.stability, difficulty: lib.difficulty)
+        }
+        // Defensive fallback — `next` only throws for `.manual`, which we never
+        // pass, so this is unreachable in practice. Preserve the pinned
+        // intervals and keep the current memory state.
+        if grade == .again {
+            return HypotheticalOutcome(intervalDays: wasMature ? 1 : 0, stability: stability, difficulty: difficulty)
+        }
+        return HypotheticalOutcome(
+            intervalDays: min(FSRSCore.maxIntervalDays, max(1, intervalDays)),
+            stability: stability,
+            difficulty: difficulty
+        )
+    }
+
     /// Shared next-interval math for advanced() + previewIntervals so the
     /// preview buttons can never disagree with the applied grade.
     private func hypotheticalInterval(for grade: Grade, retention: Double, now: Date) -> Int {
-        if let s = stability, let d = difficulty {
-            let r = FSRSCore.forgettingCurve(
-                elapsedDays: max(0, now.timeIntervalSince(updatedAt) / 86400),
-                stability: s)
-            let nextS = FSRSCore.nextStability(stability: s, difficulty: d, retrievability: r, grade: grade)
-            if grade == .again {
-                if s >= FSRSCore.matureThresholdDays || intervalDays >= 7 {
-                    return min(FSRSCore.maxIntervalDays, max(1, Int((nextS * 0.15).rounded())))
-                }
-                return 0
-            }
-            return FSRSCore.nextInterval(stability: nextS, retention: retention)
-        }
-        // New card (or pre-FSRS record): initial stability per grade.
-        let initS = FSRSCore.initialStability(for: grade)
-        if grade == .again { return 0 }
-        return FSRSCore.nextInterval(stability: initS, retention: retention)
+        hypotheticalOutcome(for: grade, retention: retention, now: now).intervalDays
     }
 
     /// Explicit grade -> next state (FSRS). Typing mistakes never grade
@@ -363,54 +352,34 @@ struct ReviewState: Codable, Equatable {
     /// accidental forgiveness.
     ///
     /// Again never resets: reps stays, lapses += 1, and a mature card
-    /// (stability or intervalDays >= 7) reschedules >= 1 day out.
+    /// (stability or intervalDays >= 7) reschedules 1 day out.
     func advanced(with grade: Grade, mistakes: Int, retention: Double = FSRSCore.defaultRetention, now: Date = Date()) -> ReviewState {
         var r = self
         r.updatedAt = now
+        r.lastReview = now
         r.totalHints += mistakes
         r.lastGrade = grade
 
-        let priorStability = stability
-        let priorDifficulty = difficulty
-        let wasMature = (priorStability ?? Double(intervalDays)) >= FSRSCore.matureThresholdDays
-            || intervalDays >= 7
-
-        if let s = priorStability, let d = priorDifficulty {
-            let retrievability = FSRSCore.forgettingCurve(
-                elapsedDays: max(0, now.timeIntervalSince(updatedAt) / 86400),
-                stability: s)
-            let nextS = FSRSCore.nextStability(stability: s, difficulty: d, retrievability: retrievability, grade: grade)
-            r.stability = nextS
-            r.difficulty = FSRSCore.nextDifficulty(difficulty: d, grade: grade)
-            if grade == .again {
-                r.lapses += 1
-                // No rep reset (FSRS has no reps concept); keep reps as-is.
-                if wasMature {
-                    // Mature lapse: proportional cut, still >= 1 day out.
-                    r.intervalDays = min(FSRSCore.maxIntervalDays, max(1, Int((nextS * 0.15).rounded())))
-                    r.due = Self.endOfDay(afterDays: r.intervalDays, from: now)
-                } else {
-                    r.intervalDays = 0
-                    r.due = now.addingTimeInterval(10 * 60) // retry in ~10 min
-                }
-            } else {
-                r.reps += 1
-                r.intervalDays = FSRSCore.nextInterval(stability: nextS, retention: retention)
-                r.due = Self.endOfDay(afterDays: r.intervalDays, from: now)
-            }
+        // Single shared path: the exact outcome previewIntervals showed.
+        let outcome = hypotheticalOutcome(for: grade, retention: retention, now: now)
+        // Memory state always comes from the library. reps/lapses keep the
+        // pinned product semantics (Again: reps stays, lapses += 1 even for a
+        // first-ever lapse, where the raw library card would leave lapses
+        // untouched); these match the library's long-term counters for
+        // review-state cards.
+        r.stability = outcome.stability
+        r.difficulty = outcome.difficulty
+        if grade == .again {
+            r.lapses += 1
+            // No rep reset (FSRS has no reps concept); keep reps as-is.
+            r.intervalDays = outcome.intervalDays
+            r.due = outcome.intervalDays < 1
+                ? now.addingTimeInterval(10 * 60) // retry in ~10 min
+                : Self.endOfDay(afterDays: outcome.intervalDays, from: now)
         } else {
-            // First FSRS grade (new card or pre-FSRS record): initialize S/D.
-            r.stability = FSRSCore.initialStability(for: grade)
-            r.difficulty = FSRSCore.initialDifficulty(for: grade)
-            if grade == .again {
-                r.lapses += 1
-                r.intervalDays = 0
-                r.due = now.addingTimeInterval(10 * 60)
-            } else {
-                r.reps += 1
-                r.intervalDays = FSRSCore.nextInterval(stability: r.stability!, retention: retention)
-                r.due = Self.endOfDay(afterDays: r.intervalDays, from: now)
-            }
+            r.reps += 1
+            r.intervalDays = outcome.intervalDays
+            r.due = Self.endOfDay(afterDays: outcome.intervalDays, from: now)
         }
         return r
     }
@@ -492,7 +461,7 @@ struct ReviewLogEntry: Codable, Equatable, Identifiable {
     }
 }
 
-// MARK: - Persistence envelope (also the sync/export format, v1/v2/v3)
+// MARK: - Persistence envelope (also the sync/export format, v1/v2/v3/v4)
 
 /// Tombstone so deletes propagate: without this, merge-as-union would
 /// resurrect a deleted verse on the next pull of an older snapshot.
@@ -503,25 +472,32 @@ struct DeletedEntry: Codable, Equatable {
 
 struct LibraryEnvelope: Codable {
     /// 1 = original (no updatedAt/tombstones), 2 = newer-wins fields,
-    /// 3 = FSRS fields (stability/difficulty) + review history.
-    /// Decoders accept any version; encoders always write 3.
+    /// 3 = FSRS fields (stability/difficulty) + review history,
+    /// 4 = library-backed scheduling (swift-fsrs) + ReviewState.lastReview +
+    /// `undoneLogIDs` tombstones. Decoders accept any version; encoders 4.
     var version: Int
     var verses: [Verse]
     var reviews: [ReviewState]
     var deleted: [DeletedEntry]
     /// FSRS review history (v3+). Missing in older payloads -> [].
     var history: [ReviewLogEntry]
+    /// Synced tombstones for undone history entries (v4+). Merge contract:
+    /// union both sides' sets, exclude those IDs from history, and drop
+    /// tombstone IDs absent from both histories (self-pruning). Missing in
+    /// older payloads -> [].
+    var undoneLogIDs: Set<UUID>
 
-    init(version: Int = 3, verses: [Verse], reviews: [ReviewState], deleted: [DeletedEntry] = [], history: [ReviewLogEntry] = []) {
+    init(version: Int = 4, verses: [Verse], reviews: [ReviewState], deleted: [DeletedEntry] = [], history: [ReviewLogEntry] = [], undoneLogIDs: Set<UUID> = []) {
         self.version = version
         self.verses = verses
         self.reviews = reviews
         self.deleted = deleted
         self.history = history
+        self.undoneLogIDs = undoneLogIDs
     }
 
     private enum CodingKeys: String, CodingKey {
-        case version, verses, reviews, deleted, history
+        case version, verses, reviews, deleted, history, undoneLogIDs
     }
 
     init(from decoder: Decoder) throws {
@@ -531,6 +507,17 @@ struct LibraryEnvelope: Codable {
         reviews = try c.decode([ReviewState].self, forKey: .reviews)
         deleted = try c.decodeIfPresent([DeletedEntry].self, forKey: .deleted) ?? []
         history = try c.decodeIfPresent([ReviewLogEntry].self, forKey: .history) ?? []
+        undoneLogIDs = try c.decodeIfPresent(Set<UUID>.self, forKey: .undoneLogIDs) ?? []
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(version, forKey: .version)
+        try c.encode(verses, forKey: .verses)
+        try c.encode(reviews, forKey: .reviews)
+        try c.encode(deleted, forKey: .deleted)
+        try c.encode(history, forKey: .history)
+        try c.encode(undoneLogIDs, forKey: .undoneLogIDs)
     }
 }
 

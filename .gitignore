@@ -3,6 +3,7 @@ build/
 DerivedData/
 *.xcuserstate
 *.xcuserdata/
+VerseLoop.xcodeproj/project.xcworkspace/
 node_modules/
 .dev.vars
 .wrangler/

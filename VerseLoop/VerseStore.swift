@@ -80,6 +80,11 @@ final class VerseStore: ObservableObject {
     /// FSRS review history (v3+). Undone grades are removed so they never
     /// pollute training data. Synced/merged as an id-union (entries immutable).
     @Published var history: [ReviewLogEntry] = []
+    /// Tombstoned history-entry IDs for undone grades (and entries of deleted
+    /// verses): without these, the next pull of an older snapshot resurrects
+    /// the undone grade via the id-union merge. Synced through the envelope's
+    /// `undoneLogIDs` field; self-pruning (see merge).
+    var undoneLogIDs: Set<UUID> = []
 
     @Published var autoSyncEnabled: Bool {
         didSet {
@@ -139,10 +144,11 @@ final class VerseStore: ObservableObject {
     }
 
     /// Clamp + persist. No rescheduling: only future grade() calls use it.
+    /// Persistence lives in the didSet (UserDefaults only — retention is not
+    /// part of the library); no save() here, because the Slider fires this
+    /// per tick and each tick must not re-encode + rewrite the whole library.
     func setDesiredRetention(_ value: Double) {
         desiredRetention = min(max(value, Self.minRetention), Self.maxRetention)
-        UserDefaults.standard.set(desiredRetention, forKey: "desiredRetention")
-        save()
     }
 
     // MARK: - Reminders (local notifications, no server involved)
@@ -342,6 +348,10 @@ final class VerseStore: ObservableObject {
     func deleteVerse(_ verse: Verse) {
         verses.removeAll { $0.id == verse.id }
         reviews.removeValue(forKey: verse.id)
+        // Move this verse's entry IDs into undoneLogIDs instead of just
+        // dropping them: the remote copy still holds them, and the id-union
+        // merge would otherwise resurrect them as orphan history.
+        undoneLogIDs.formUnion(history.filter { $0.verseId == verse.id }.map(\.id))
         history.removeAll { $0.verseId == verse.id }
         let now = Date()
         deleted.removeAll { $0.verseId == verse.id }
@@ -362,6 +372,7 @@ final class VerseStore: ObservableObject {
         gradeUndoStack.append(GradeUndo(verseId: verseId, previous: current, grade: grade, logEntryId: entry.id))
         reviews[verseId] = next
         history.append(entry)
+        pruneHistory()
         undoToast = "Graded \(grade.title) · \(mistakes) mistake\(mistakes == 1 ? "" : "s") — Undo"
         save()
         refreshReminders()
@@ -374,6 +385,9 @@ final class VerseStore: ObservableObject {
         restored.updatedAt = Date()
         reviews[last.verseId] = restored
         history.removeAll { $0.id == last.logEntryId }
+        // Tombstone the undone entry ID so the next auto-sync pull of the
+        // older remote snapshot can't resurrect it via the id-union merge.
+        undoneLogIDs.insert(last.logEntryId)
         undoToast = nil
         save()
         refreshReminders()
@@ -492,6 +506,7 @@ final class VerseStore: ObservableObject {
         reviews = [:]
         deleted = []
         history = []
+        undoneLogIDs = []
         gradeUndoStack = []
         undoToast = nil
         lastSyncAt = nil
@@ -508,16 +523,40 @@ final class VerseStore: ObservableObject {
 
     // MARK: - Persistence (local JSON, offline-first)
 
+    /// History cap: entries are immutable and ride every sync envelope (256 KB
+    /// Worker cap) — ~500 entries × ~200 B ≈ 100 KB, well under it with room for verses.
+    static let maxHistoryEntries = 500
+
+    /// Keep only the newest entries by reviewedAt. Called at the end of
+    /// grade(), merge(), and load().
+    private func pruneHistory() {
+        guard history.count > Self.maxHistoryEntries else { return }
+        history = Array(history.sorted { $0.reviewedAt < $1.reviewedAt }.suffix(Self.maxHistoryEntries))
+    }
+
+    /// Encode the full library as version-4 JSON, tombstones included, so
+    /// undone grades survive save / export / push and can't be resurrected
+    /// by the next pull.
+    private func encodeLibraryData() throws -> Data {
+        let env = LibraryEnvelope(version: 4, verses: verses, reviews: Array(reviews.values), deleted: deleted, history: history, undoneLogIDs: undoneLogIDs)
+        return try JSONEncoder().encode(env)
+    }
+
+    /// Decode a blob written by encodeLibraryData (older envelopes without
+    /// the v4 keys decode to empty history/tombstones).
+    private static func decodeLibraryData(_ data: Data) throws -> (LibraryEnvelope, Set<UUID>) {
+        let env = try JSONDecoder().decode(LibraryEnvelope.self, from: data)
+        return (env, env.undoneLogIDs)
+    }
+
     private var libraryURL: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("verseloop.json")
     }
 
     func save() {
-        let env = LibraryEnvelope(version: 3, verses: verses, reviews: Array(reviews.values), deleted: deleted, history: history)
         do {
-            let data = try JSONEncoder().encode(env)
-            try data.write(to: libraryURL, options: .atomic)
+            try encodeLibraryData().write(to: libraryURL, options: .atomic)
         } catch {
             syncMessage = "Save failed: \(error.localizedDescription)"
         }
@@ -526,11 +565,13 @@ final class VerseStore: ObservableObject {
     @discardableResult
     private func load() -> Bool {
         guard let data = try? Data(contentsOf: libraryURL),
-              let env = try? JSONDecoder().decode(LibraryEnvelope.self, from: data) else { return false }
+              let (env, undone) = try? Self.decodeLibraryData(data) else { return false }
         verses = env.verses
         reviews = Dictionary(uniqueKeysWithValues: env.reviews.map { ($0.verseId, $0) })
         deleted = env.deleted
-        history = env.history
+        history = env.history.sorted { $0.reviewedAt < $1.reviewedAt }
+        undoneLogIDs = undone
+        pruneHistory()
         return true
     }
 
@@ -546,14 +587,14 @@ final class VerseStore: ObservableObject {
         reviews = Dictionary(uniqueKeysWithValues: seeds.map { ($0.id, ReviewState(verseId: $0.id, ease: 2.5, intervalDays: 0, due: now, reps: 0, lapses: 0, totalHints: 0, lastGrade: nil, updatedAt: now)) })
         deleted = []
         history = []
+        undoneLogIDs = []
         save()
     }
 
     // MARK: - Export / Import (fixes "no way to get my data out")
 
     func exportURL() throws -> URL {
-        let env = LibraryEnvelope(version: 3, verses: verses, reviews: Array(reviews.values), deleted: deleted, history: history)
-        let data = try JSONEncoder().encode(env)
+        let data = try encodeLibraryData()
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("verseloop-export.json")
         try data.write(to: url, options: .atomic)
         return url
@@ -569,7 +610,7 @@ final class VerseStore: ObservableObject {
     /// Newer-wins per record (same rule as pull), so imports can't regress
     /// newer local grades either.
     func importJSON(_ data: Data) throws {
-        let env = try JSONDecoder().decode(LibraryEnvelope.self, from: data)
+        let (env, _) = try Self.decodeLibraryData(data)
         merge(env)
         save()
         refreshReminders()
@@ -627,15 +668,11 @@ final class VerseStore: ObservableObject {
         await pull()
     }
 
-    private struct RemoteSnapshot {
-        let envelope: LibraryEnvelope
-    }
-
     /// GET the server snapshot and decrypt it. Returns nil on 404 (never
     /// pushed). Throws SyncError.server("wrong sync code…") when the
     /// ciphertext can't be opened with the current code — callers must NOT
     /// push in that case, or they'd overwrite someone else's snapshot.
-    private func fetchRemote() async throws -> RemoteSnapshot? {
+    private func fetchRemote() async throws -> LibraryEnvelope? {
         let url = try syncEndpoint(path: "")
         var req = URLRequest(url: url)
         req.timeoutInterval = 15
@@ -649,12 +686,15 @@ final class VerseStore: ObservableObject {
         if let enc = try? JSONDecoder().decode(EncryptedEnvelope.self, from: data),
            enc.version == 2, !enc.ciphertext.isEmpty {
             do {
-                return RemoteSnapshot(envelope: try SyncCrypto.open(enc, code: code))
+                guard let combined = Data(base64Encoded: enc.ciphertext) else { throw SyncCrypto.CryptoError.encoding }
+                let box = try AES.GCM.SealedBox(combined: combined)
+                let plain = try AES.GCM.open(box, using: SyncCrypto.key(fromCode: code))
+                return try JSONDecoder().decode(LibraryEnvelope.self, from: plain)
             } catch {
                 throw SyncError.server("wrong sync code or corrupt snapshot")
             }
         }
-        return RemoteSnapshot(envelope: try JSONDecoder().decode(LibraryEnvelope.self, from: data))
+        return try JSONDecoder().decode(LibraryEnvelope.self, from: data)
     }
 
     /// Read-modify-write: pull-merge first so a stale local push can never
@@ -662,7 +702,7 @@ final class VerseStore: ObservableObject {
     func push() async {
         do {
             if let remote = try await fetchRemote() {
-                merge(remote.envelope)
+                merge(remote)
                 save()
             }
             let url = try syncEndpoint(path: "")
@@ -670,10 +710,13 @@ final class VerseStore: ObservableObject {
             req.httpMethod = "PUT"
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.timeoutInterval = 15
-            let inner = LibraryEnvelope(version: 3, verses: verses, reviews: Array(reviews.values), deleted: deleted, history: history)
             let code = syncCode.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !code.isEmpty else { throw SyncError.noCode }
-            req.httpBody = try JSONEncoder().encode(SyncCrypto.seal(inner, code: code))
+            // Seal the v4 JSON directly (not via SyncCrypto.seal) so history
+            // and tombstones stay inside the ciphertext too.
+            let plain = try encodeLibraryData()
+            let box = try AES.GCM.seal(plain, using: SyncCrypto.key(fromCode: code))
+            req.httpBody = try JSONEncoder().encode(EncryptedEnvelope(version: 2, ciphertext: box.combined!.base64EncodedString(), updatedAt: Date()))
             let (_, resp) = try await URLSession.shared.data(for: req)
             guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw SyncError.server("HTTP \((resp as? HTTPURLResponse)?.statusCode ?? -1)") }
             lastSyncAt = Date()
@@ -690,7 +733,7 @@ final class VerseStore: ObservableObject {
                 syncMessage = "No snapshot yet — push first"
                 return
             }
-            merge(remote.envelope)
+            merge(remote)
             lastSyncAt = Date()
             syncMessage = "Pulled \(verses.count) verses ✓"
             save()
@@ -704,7 +747,11 @@ final class VerseStore: ObservableObject {
     /// - verses/reviews keep whichever side has the larger updatedAt (ties: local)
     /// - deletes propagate via tombstones; tombstoned ids are not resurrected
     ///   by older snapshots
+    /// - undone grades propagate via undoneLogIDs; tombstoned entry ids are
+    ///   excluded from the merged history, then tombstones present in neither
+    ///   side's pre-merge history are dropped so the set can't grow forever
     private func merge(_ env: LibraryEnvelope) {
+        let remoteUndone = env.undoneLogIDs
         var tombById: [UUID: Date] = Dictionary(uniqueKeysWithValues: deleted.map { ($0.verseId, $0.deletedAt) })
         for d in env.deleted {
             if let cur = tombById[d.verseId] {
@@ -749,9 +796,16 @@ final class VerseStore: ObservableObject {
         }
         deleted = kept
         // History: id-union (entries immutable). On id conflict keep the
-        // newer reviewedAt. Then drop entries for tombstoned verses so a
-        // delete isn't resurrected as orphan history on the next pull.
+        // newer reviewedAt. Undone-grade tombstones win over the union: both
+        // sides' sets are unioned into the store set, tombstoned ids are
+        // excluded, then tombstones in neither side's pre-merge history are
+        // dropped (self-pruning). Then drop entries for tombstoned verses so
+        // a delete isn't resurrected as orphan history on the next pull.
+        // Assigned chronologically (reviewedAt ascending) so the append-only
+        // log order is stable across launches for future stats/optimizer.
         var hById: [UUID: ReviewLogEntry] = Dictionary(uniqueKeysWithValues: history.map { ($0.id, $0) })
+        let localHistoryIDs = Set(hById.keys)
+        let remoteHistoryIDs = Set(env.history.map(\.id))
         for e in env.history {
             if let local = hById[e.id] {
                 if e.reviewedAt > local.reviewedAt { hById[e.id] = e }
@@ -759,12 +813,16 @@ final class VerseStore: ObservableObject {
                 hById[e.id] = e
             }
         }
+        let knownHistoryIDs = localHistoryIDs.union(remoteHistoryIDs)
+        undoneLogIDs = undoneLogIDs.union(remoteUndone).intersection(knownHistoryIDs)
         let tombSet = Set(tombById.keys)
         history = hById.values.filter { e in
+            guard !undoneLogIDs.contains(e.id) else { return false }
             guard tombSet.contains(e.verseId) else { return true }
             if let v = vById[e.verseId] { return v.updatedAt > (tombById[e.verseId] ?? .distantPast) }
             return false
-        }
+        }.sorted { $0.reviewedAt < $1.reviewedAt }
+        pruneHistory()
     }
 
     func esvService() -> ESVService {

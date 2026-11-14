@@ -7,7 +7,7 @@ This repo is **Verse Loop Daily**: a native iOS app (SwiftUI, zero dependencies)
 ```
 VerseLoop/              native iOS app (iOS 17+, iPhone SE 3 supported)
   VerseLoopApp.swift    entry
-  Models.swift          Verse, Grade, FSRS ReviewState, LibraryEnvelope v3 (history)
+  Models.swift          Verse, Grade, FSRS ReviewState (swift-fsrs), envelope v4
   VerseStore.swift      queue, grading + undo, JSON persistence, export/import, sync
   ESVService.swift      Worker-proxy-first ESV fetch, direct fallback
   ContentView.swift     Loop / Verses / Add / Settings tabs
@@ -52,7 +52,7 @@ Path filters are load-bearing: app-only changes must not trigger worker deploys 
 
 ## Guardrails
 
-1. **Zero dependencies, SwiftUI only.** Do not add packages, web views, media, or analytics SDKs. Offline-first; reviews are pure local computation.
+1. **One dependency: swift-fsrs.** The app is SwiftUI-only plus the `swift-fsrs` SPM package (FSRS-6 scheduler). No other packages, web views, media, or analytics SDKs. Offline-first; reviews are pure local computation.
 2. **ESV text is never committed.** ESV © Crossway — no ESV passages in code, seeds, tests, or fixtures. The app ships with two short public-domain KJV demo verses so the simulator works offline; real ESV text is fetched at runtime through the Worker. Test fixtures must use KJV/short invented strings only.
 3. **No secrets in git.** `ESV_API_TOKEN` lives as a repo secret + Wrangler secret, never in `wrangler.toml` or code. No API key on-device.
 4. **Sync is opaque.** Libraries are AES-GCM encrypted client-side (key from sync code via HKDF-SHA256); the Worker only stores ciphertext, capped at 256 KB. Endpoints: `GET /health`, `GET /v1/esv?q=`, `PUT/GET /v1/sync/:code`. KV binding `SYNC_KV` is optional (free tier); code must keep working without it.
