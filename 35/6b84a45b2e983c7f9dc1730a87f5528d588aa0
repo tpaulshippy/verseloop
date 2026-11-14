@@ -1,0 +1,26 @@
+AGENTS.md
+  h_6bbd00fe0a456a 3,59
+README.md
+  h_6bbd00fe0a456a 5,48
+VerseLoop/ContentView.swift
+  h_6bbd00fe0a456a 405
+VerseLoop/Models.swift
+  h_6bbd00fe0a456a 167-176,183,186,199-200,222-225,242-243,303-309,312,318,321,332-336,342-343,346-350,358,361-363,373-375,408-412
+VerseLoop/VerseStore.swift
+  h_6bbd00fe0a456a 689,712-713
+appstore/metadata.md
+  h_6bbd00fe0a456a 32,53
+worker/src/index.ts
+  h_6bbd00fe0a456a 174,197,218
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "356b84a45b2e983c7f9dc1730a87f5528d588aa0",
+  "prompts": {},
+  "humans": {
+    "h_6bbd00fe0a456a": {
+      "author": "Paul Shippy <pshippy@gmail.com>"
+    }
+  }
+}
