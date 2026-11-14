@@ -402,6 +402,7 @@ struct SettingsView: View {
                         in: VerseStore.minRetention...VerseStore.maxRetention,
                         step: 0.01
                     ) { Text("Want to remember") }
+                    .accessibilityValue("\(Int((store.desiredRetention * 100).rounded())) percent")
                     .accessibilityIdentifier("retention-slider")
                     HStack(spacing: 8) {
                         retentionPreset(title: "Relaxed 85%", value: 0.85)

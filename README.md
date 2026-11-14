@@ -2,7 +2,7 @@
 
 Start the day by memorizing ESV verses word-by-word — from first letters, with the reference tested last.
 
-A native iOS app (SwiftUI, zero dependencies, offline-first) built for one workflow: a single due-sorted **Loop**, one verse at a time, with real spaced repetition behind it. One daily Loop, one tester, one scheduler.
+A native iOS app (SwiftUI plus the swift-fsrs scheduler, no other dependencies, offline-first) built for one workflow: a single due-sorted **Loop**, one verse at a time, with real spaced repetition behind it. One daily Loop, one tester, one scheduler.
 
 ## How a rep feels
 
@@ -45,6 +45,6 @@ Pushing to `main` is all it takes:
 
 ## For developers and agents
 
-See **[AGENTS.md](AGENTS.md)** for project layout, how to run the simulator and UI tests, and the guardrails (no ESV text in git, zero dependencies, opaque sync, SE3 target).
+See **[AGENTS.md](AGENTS.md)** for project layout, how to run the simulator and UI tests, and the guardrails (no ESV text in git, one dependency, opaque sync, SE3 target).
 
 `recordings/` holds simulator screen recordings and screenshots of the full flow on iPhone SE (3rd generation), dark mode.

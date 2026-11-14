@@ -164,15 +164,26 @@ struct ReviewState: Codable, Equatable {
     ///
     /// UNDO CONTRACT: undoLastGrade() must restore previous.lastReview verbatim (never now), or elapsed time restarts.
     var lastReview: Date?
+    /// Library card state raw value (CardState: 0 new / 1 learning / 2 review /
+    /// 3 relearning). Nil for never-reviewed / pre-persistence records, which
+    /// reconstruct as `.new` / `.review` respectively. Written back from the
+    /// graded library card on every grade so intraday learning/relearning
+    /// steps survive across calls instead of resetting to `.review`.
+    var fsrsStateRaw: Int?
+    /// 0-based index into the library's learning/relearning steps. Only
+    /// meaningful while `fsrsStateRaw` is learning/relearning; nil for old
+    /// records (treated as 0).
+    var fsrsStep: Int?
 
     private enum CodingKeys: String, CodingKey {
         case verseId, ease, intervalDays, due, reps, lapses, lastGrade
         case totalHints = "totalPeeks" // v1 key kept so existing libraries still decode
         case updatedAt
         case stability, difficulty, lastReview
+        case fsrsStateRaw, fsrsStep
     }
 
-    init(verseId: UUID, ease: Double, intervalDays: Int, due: Date, reps: Int, lapses: Int, totalHints: Int, lastGrade: Grade?, updatedAt: Date? = nil, stability: Double? = nil, difficulty: Double? = nil, lastReview: Date? = nil) {
+    init(verseId: UUID, ease: Double, intervalDays: Int, due: Date, reps: Int, lapses: Int, totalHints: Int, lastGrade: Grade?, updatedAt: Date? = nil, stability: Double? = nil, difficulty: Double? = nil, lastReview: Date? = nil, fsrsStateRaw: Int? = nil, fsrsStep: Int? = nil) {
         self.verseId = verseId
         self.ease = ease
         self.intervalDays = intervalDays
@@ -185,6 +196,8 @@ struct ReviewState: Codable, Equatable {
         self.stability = stability
         self.difficulty = difficulty
         self.lastReview = lastReview
+        self.fsrsStateRaw = fsrsStateRaw
+        self.fsrsStep = fsrsStep
     }
 
     init(from decoder: Decoder) throws {
@@ -206,6 +219,10 @@ struct ReviewState: Codable, Equatable {
         // Pre-lastReview records carry no explicit grade time — nil so elapsed
         // time falls back to updatedAt until the next explicit grade sets it.
         lastReview = try c.decodeIfPresent(Date.self, forKey: .lastReview)
+        // Pre-persistence records carry no library state/step — nil so the
+        // transient card falls back to `.review` / step 0 until the next grade.
+        fsrsStateRaw = try c.decodeIfPresent(Int.self, forKey: .fsrsStateRaw)
+        fsrsStep = try c.decodeIfPresent(Int.self, forKey: .fsrsStep)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -222,6 +239,8 @@ struct ReviewState: Codable, Equatable {
         try c.encodeIfPresent(stability, forKey: .stability)
         try c.encodeIfPresent(difficulty, forKey: .difficulty)
         try c.encodeIfPresent(lastReview, forKey: .lastReview)
+        try c.encodeIfPresent(fsrsStateRaw, forKey: .fsrsStateRaw)
+        try c.encodeIfPresent(fsrsStep, forKey: .fsrsStep)
     }
 
     static func fresh(verseId: UUID, now: Date = Date()) -> ReviewState {
@@ -281,20 +300,25 @@ struct ReviewState: Codable, Equatable {
 
     /// Transient library Card rebuilt from our stored fields on every call —
     /// the library is stateless, so this is the only handoff. Reviewed cards
-    /// (stability + difficulty present) resume as `.review` with elapsed time
-    /// counted from `lastReview` (falling back to `updatedAt` for records
-    /// written before `lastReview` existed); never-reviewed and pre-FSRS
-    /// records enter as `.new` so the library initializes S/D from scratch.
+    /// (stability + difficulty present) resume in their persisted library
+    /// state (`fsrsStateRaw`, falling back to `.review` for records written
+    /// before state persistence) at the persisted step index (`fsrsStep`,
+    /// falling back to 0), with elapsed time counted from `lastReview`
+    /// (falling back to `updatedAt` for records written before `lastReview`
+    /// existed); never-reviewed and pre-FSRS records enter as `.new` so the
+    /// library initializes S/D from scratch.
     private func transientLibraryCard() -> Card {
         if let s = stability, let d = difficulty {
+            let state = fsrsStateRaw.flatMap(CardState.init(rawValue:)) ?? .review
             return Card(
                 due: due,
                 stability: s,
                 difficulty: d,
                 scheduledDays: Double(intervalDays),
+                learningSteps: fsrsStep ?? 0,
                 reps: reps,
                 lapses: lapses,
-                state: .review,
+                state: state,
                 lastReview: lastReview ?? updatedAt
             )
         }
@@ -305,23 +329,25 @@ struct ReviewState: Codable, Equatable {
     /// `advanced` so previews can never drift from the applied grade. Runs
     /// the transient card through the library and takes the library card's
     /// due verbatim (textbook: minute precision while learning/relearning,
-    /// day precision once graduated). `intervalDays` is the calendar-day
-    /// difference derived from that due (0 = due intraday, which the preview
-    /// layer displays as "~10m").
+    /// day precision once graduated). `intervalDays` preserves the library's
+    /// `scheduledDays` (rounded to nearest, floor 0, capped): intraday
+    /// learning/relearning steps report `scheduledDays` 0, so an intraday
+    /// due crossing midnight still yields 0 (displayed as "~10m") instead of
+    /// becoming a one-day interval via calendar-day math.
     private struct HypotheticalOutcome {
         var intervalDays: Int
         var due: Date
         var stability: Double?
         var difficulty: Double?
+        var fsrsStateRaw: Int?
+        var fsrsStep: Int?
     }
 
-    /// Calendar-day difference from `now` to `due`, clamped to
-    /// 0...maxIntervalDays. Same-calendar-day dues (including minute-scale
-    /// learning/relearning steps) yield 0.
-    private static func calendarIntervalDays(from now: Date, to due: Date) -> Int {
-        let cal = Calendar.current
-        let days = cal.dateComponents([.day], from: cal.startOfDay(for: now), to: cal.startOfDay(for: due)).day ?? 0
-        return min(FSRSCore.maxIntervalDays, max(0, days))
+    /// Library `scheduledDays` rounded to the nearest whole day, floored at 0
+    /// and capped at `maxIntervalDays`. Intraday steps (`scheduledDays` 0)
+    /// yield 0.
+    private static func cappedIntervalDays(_ scheduledDays: Double) -> Int {
+        min(FSRSCore.maxIntervalDays, max(0, Int(scheduledDays.rounded())))
     }
 
     private func hypotheticalOutcome(for grade: Grade, retention: Double, now: Date) -> HypotheticalOutcome {
@@ -329,10 +355,12 @@ struct ReviewState: Codable, Equatable {
         if let item = try? scheduler.next(card: transientLibraryCard(), now: now, grade: FSRSCore.rating(for: grade)) {
             let lib = item.card
             return HypotheticalOutcome(
-                intervalDays: Self.calendarIntervalDays(from: now, to: lib.due),
+                intervalDays: Self.cappedIntervalDays(lib.scheduledDays),
                 due: lib.due,
                 stability: lib.stability,
-                difficulty: lib.difficulty
+                difficulty: lib.difficulty,
+                fsrsStateRaw: lib.state.rawValue,
+                fsrsStep: lib.learningSteps
             )
         }
         // Defensive fallback — `next` only throws for `.manual`, which we never
@@ -342,7 +370,9 @@ struct ReviewState: Codable, Equatable {
             intervalDays: min(FSRSCore.maxIntervalDays, max(0, intervalDays)),
             due: due,
             stability: stability,
-            difficulty: difficulty
+            difficulty: difficulty,
+            fsrsStateRaw: fsrsStateRaw,
+            fsrsStep: fsrsStep
         )
     }
 
@@ -375,6 +405,11 @@ struct ReviewState: Codable, Equatable {
         // review-state cards.
         r.stability = outcome.stability
         r.difficulty = outcome.difficulty
+        // Persist the library's post-grade state + step index so the next
+        // grade resumes intraday learning/relearning instead of resetting to
+        // `.review` and graduating prematurely.
+        r.fsrsStateRaw = outcome.fsrsStateRaw
+        r.fsrsStep = outcome.fsrsStep
         if grade == .again {
             r.lapses += 1
             // No rep reset (FSRS has no reps concept); keep reps as-is.

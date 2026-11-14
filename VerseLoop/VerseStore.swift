@@ -686,10 +686,7 @@ final class VerseStore: ObservableObject {
         if let enc = try? JSONDecoder().decode(EncryptedEnvelope.self, from: data),
            enc.version == 2, !enc.ciphertext.isEmpty {
             do {
-                guard let combined = Data(base64Encoded: enc.ciphertext) else { throw SyncCrypto.CryptoError.encoding }
-                let box = try AES.GCM.SealedBox(combined: combined)
-                let plain = try AES.GCM.open(box, using: SyncCrypto.key(fromCode: code))
-                return try JSONDecoder().decode(LibraryEnvelope.self, from: plain)
+                return try SyncCrypto.open(enc, code: code)
             } catch {
                 throw SyncError.server("wrong sync code or corrupt snapshot")
             }
@@ -712,11 +709,8 @@ final class VerseStore: ObservableObject {
             req.timeoutInterval = 15
             let code = syncCode.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !code.isEmpty else { throw SyncError.noCode }
-            // Seal the v4 JSON directly (not via SyncCrypto.seal) so history
-            // and tombstones stay inside the ciphertext too.
-            let plain = try encodeLibraryData()
-            let box = try AES.GCM.seal(plain, using: SyncCrypto.key(fromCode: code))
-            req.httpBody = try JSONEncoder().encode(EncryptedEnvelope(version: 2, ciphertext: box.combined!.base64EncodedString(), updatedAt: Date()))
+            let envelope = LibraryEnvelope(version: 4, verses: verses, reviews: Array(reviews.values), deleted: deleted, history: history, undoneLogIDs: undoneLogIDs)
+            req.httpBody = try JSONEncoder().encode(SyncCrypto.seal(envelope, code: code))
             let (_, resp) = try await URLSession.shared.data(for: req)
             guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw SyncError.server("HTTP \((resp as? HTTPURLResponse)?.statusCode ?? -1)") }
             lastSyncAt = Date()

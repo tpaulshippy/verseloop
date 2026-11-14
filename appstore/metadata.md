@@ -29,7 +29,7 @@ ESV-only memorization with real spaced repetition. Type first letters, forgive s
 ### Description (4000 chars)
 Start the day by memorizing ESV verses word-by-word — from first letters, with the reference tested last.
 
-Verse Loop Daily is a native, offline-first iOS app with zero dependencies for one workflow: a daily Loop of due verses, a forgiving first-letter tester, and FSRS-inspired spaced repetition driven by your own Again / Hard / Good / Easy grades.
+Verse Loop Daily is a native, offline-first iOS app (SwiftUI plus the swift-fsrs scheduler, no other dependencies) for one workflow: a daily Loop of due verses, a forgiving first-letter tester, and FSRS-inspired spaced repetition driven by your own Again / Hard / Good / Easy grades.
 
 HOW IT WORKS
 • Today tab shows your due-sorted Loop: Due / Total / Mastered at a glance.
@@ -50,7 +50,7 @@ YOUR DATA IS YOURS
 • Delete everything anytime: Settings → Delete All My Data removes local verses + history, deletes the cloud backup, and rotates the code. Full equivalent of account deletion — there are no accounts.
 
 BUILT FOR FOCUS
-Zero dependencies, SwiftUI only, no web views, no media. Cold start <1s. Full dark-mode support. iPhone SE to Pro Max.
+SwiftUI plus the swift-fsrs scheduler, no other dependencies, no web views, no media. Cold start <1s. Full dark-mode support. iPhone SE to Pro Max.
 
 Scripture quotations are from the ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission via the ESV API. All rights reserved.
 

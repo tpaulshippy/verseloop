@@ -171,7 +171,7 @@ const PRIVACY_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"
 <p>We do not collect, sell, or share personal data. Your verses and review history stay on your device unless you turn on the optional encrypted backup — which we cannot read (see below).</p>
 <h2>What is stored, and where</h2>
 <ul>
-<li><strong>On your device only (by default):</strong> the verse references and texts you add, your SM-2 review schedule (ease, intervals, due dates), grades, mistake counts, and app settings (auto-sync preference). Stored in the app's local JSON file and UserDefaults. Deleted when you delete the app or use <em>Settings → Delete All My Data</em>.</li>
+<li><strong>On your device only (by default):</strong> the verse references and texts you add, your review schedule (stability, difficulty, intervals, due dates), grades, mistake counts, and app settings (auto-sync preference). Stored in the app's local JSON file and UserDefaults. Deleted when you delete the app or use <em>Settings → Delete All My Data</em>.</li>
 <li><strong>Optional encrypted cloud backup:</strong> if auto-sync/backup runs, the app encrypts your full library on-device with AES-GCM (key derived from your random sync code via HKDF-SHA256) and uploads only the opaque ciphertext to our Cloudflare Worker. The server never sees verse text, references, or schedules and has no way to decrypt them.</li>
 <li><strong>ESV passage fetch:</strong> when you tap "Fetch ESV text", the app sends only the Bible reference you typed (e.g. "John 1:1") to our Worker, which forwards it to api.esv.org and returns the passage text. No identifiers are attached; responses are cached 24h to stay inside ESV quotas.</li>
 </ul>
@@ -194,7 +194,7 @@ const PRIVACY_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"
 <li>Deleting the iOS app removes on-device data; run Delete All My Data first if you also want the cloud ciphertext erased.</li>
 </ul>
 <h2>Data portability</h2>
-<p><em>Settings → Prepare JSON export</em> gives you your full library (verses + schedule + tombstones, v2 JSON) at any time.</p>
+<p><em>Settings → Prepare JSON export</em> gives you your full library (verses + schedule + review history + tombstones, v4 JSON) at any time.</p>
 <h2>Children</h2>
 <p>Verse Loop Daily collects no personal data from anyone, including children, and is rated 4+.</p>
 <h2>Contact / data requests</h2>
@@ -215,7 +215,7 @@ const SUPPORT_HTML = `<!doctype html><html lang="en"><head><meta charset="utf-8"
 <ol>
 <li>Open <strong>Verses → +</strong>, type a reference (e.g. <code>John 1:1</code> or <code>Psalm 23:1-6</code>), tap <strong>Fetch ESV text</strong>, then Save.</li>
 <li>Open <strong>Today</strong>, tap a due verse, and type the first letter of each word — then the book initial and numbers for the reference.</li>
-<li>Grade yourself: Again / Hard / Good / Easy. That grade drives the SM-2 schedule. Every grade has an 8-second Undo.</li>
+<li>Grade yourself: Again / Hard / Good / Easy. That grade drives the FSRS schedule. Every grade has an 8-second Undo.</li>
 </ol>
 <h2>Backup, export, and moving devices</h2>
 <ul>
