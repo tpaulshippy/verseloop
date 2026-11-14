@@ -1,0 +1,18 @@
+AGENTS.md
+  h_6bbd00fe0a456a 59
+VerseLoop/Models.swift
+  h_6bbd00fe0a456a 93-99,104-106,114-116,123,306-310,313,318-326,331-336,339-340,342-343,359-361,384-385
+appstore/metadata.md
+  h_6bbd00fe0a456a 41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f77cfb917ad6e0a36e01bf473686a1b71b0725c6",
+  "prompts": {},
+  "humans": {
+    "h_6bbd00fe0a456a": {
+      "author": "Paul Shippy <pshippy@gmail.com>"
+    }
+  }
+}
