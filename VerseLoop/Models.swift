@@ -90,29 +90,37 @@ enum Grade: String, CaseIterable, Codable {
 // interval formula did not invert the forgetting curve — the inversion now
 // happens inside the library (`nextInterval` scaling by `intervalModifier`).
 //
-// Short-term scheduling is disabled: minute-scale learning/relearning steps
-// would bypass our pinned same-day-retry (~10m) and end-of-day normalization.
+// Textbook FSRS: short-term (learning/relearning) steps are enabled, so the
+// due date comes straight from the library card in all cases — minute
+// precision while a card is still being learned, day precision once it
+// graduates. The ONE intentional deviation from textbook is
+// `maximumInterval: 365`, a product guardrail so a verse never schedules
+// decades out; everything else follows the library defaults
+// (learning steps 1m/10m, relearning steps 10m).
 
 enum FSRSCore {
     /// Desired retention (probability of recall at due time). 0.9 default.
     static let defaultRetention: Double = 0.9
-    /// Hard cap on any scheduled interval.
+    /// Hard cap on any scheduled interval. This is the one intentional
+    /// deviation from textbook FSRS (a product guardrail so verses never
+    /// schedule decades out); everything else follows library defaults.
     static let maxIntervalDays: Int = 365
-    /// Stability at/above which a lapse still schedules >= 1 day out.
-    static let matureThresholdDays: Double = 7
 
     /// Per-call scheduler at the requested retention. Constructed fresh per
     /// grade/preview so `requestRetention` always applies; the instance is an
     /// immutable value-style config wrapper, so this is cheap.
     /// `enableFuzz: false` keeps scheduling deterministic so the grade-button
     /// previews can never disagree with the applied grade.
+    /// `enableShortTerm: true` is textbook FSRS: learning steps (1m/10m) and
+    /// relearning steps (10m) come from the library defaults, so lapses come
+    /// back in ~10 minutes through relearning steps.
     static func makeScheduler(retention: Double = defaultRetention) -> FSRS {
         FSRS(parameters: FSRSParameters(
             requestRetention: retention,
             maximumInterval: Double(maxIntervalDays),
             w: FSRSDefaults.defaultWv6,
             enableFuzz: false,
-            enableShortTerm: false
+            enableShortTerm: true
         ))
     }
 
@@ -295,47 +303,44 @@ struct ReviewState: Codable, Equatable {
 
     /// One private hypothetical path shared by `previewIntervals` and
     /// `advanced` so previews can never drift from the applied grade. Runs
-    /// the transient card through the library, then applies the pinned
-    /// product clamps: Again on a young card -> 0 (~10m retry); Again on a
-    /// mature card -> 1 (intentional product clamp, not the raw library
-    /// value); Hard/Good/Easy -> library days clamped to 1...maxIntervalDays.
+    /// the transient card through the library and takes the library card's
+    /// due verbatim (textbook: minute precision while learning/relearning,
+    /// day precision once graduated). `intervalDays` is the calendar-day
+    /// difference derived from that due (0 = due intraday, which the preview
+    /// layer displays as "~10m").
     private struct HypotheticalOutcome {
         var intervalDays: Int
+        var due: Date
         var stability: Double?
         var difficulty: Double?
     }
 
+    /// Calendar-day difference from `now` to `due`, clamped to
+    /// 0...maxIntervalDays. Same-calendar-day dues (including minute-scale
+    /// learning/relearning steps) yield 0.
+    private static func calendarIntervalDays(from now: Date, to due: Date) -> Int {
+        let cal = Calendar.current
+        let days = cal.dateComponents([.day], from: cal.startOfDay(for: now), to: cal.startOfDay(for: due)).day ?? 0
+        return min(FSRSCore.maxIntervalDays, max(0, days))
+    }
+
     private func hypotheticalOutcome(for grade: Grade, retention: Double, now: Date) -> HypotheticalOutcome {
-        // Pre-FSRS cards carry stability == nil, so the intervalDays leg must
-        // route them: a 30d-interval card with nil stability is mature.
-        let wasMature = (stability ?? Double(intervalDays)) >= FSRSCore.matureThresholdDays
-            || intervalDays >= 7
         let scheduler = FSRSCore.makeScheduler(retention: retention)
         if let item = try? scheduler.next(card: transientLibraryCard(), now: now, grade: FSRSCore.rating(for: grade)) {
             let lib = item.card
-            if grade == .again {
-                // Intentional product clamp: young lapses retry today (0 keeps
-                // the due-+10min / "~10m" preview behavior); mature lapses
-                // schedule exactly 1 day out (due end-of-day tomorrow) instead
-                // of the old 10-minute reset. This is the fix for the reported
-                // mature-lapse 10-minute-reset bug.
-                return HypotheticalOutcome(
-                    intervalDays: wasMature ? 1 : 0,
-                    stability: lib.stability,
-                    difficulty: lib.difficulty
-                )
-            }
-            let days = min(FSRSCore.maxIntervalDays, max(1, Int(lib.scheduledDays.rounded())))
-            return HypotheticalOutcome(intervalDays: days, stability: lib.stability, difficulty: lib.difficulty)
+            return HypotheticalOutcome(
+                intervalDays: Self.calendarIntervalDays(from: now, to: lib.due),
+                due: lib.due,
+                stability: lib.stability,
+                difficulty: lib.difficulty
+            )
         }
         // Defensive fallback — `next` only throws for `.manual`, which we never
-        // pass, so this is unreachable in practice. Preserve the pinned
-        // intervals and keep the current memory state.
-        if grade == .again {
-            return HypotheticalOutcome(intervalDays: wasMature ? 1 : 0, stability: stability, difficulty: difficulty)
-        }
+        // pass, so this is unreachable in practice. Keep the current schedule
+        // and memory state.
         return HypotheticalOutcome(
-            intervalDays: min(FSRSCore.maxIntervalDays, max(1, intervalDays)),
+            intervalDays: min(FSRSCore.maxIntervalDays, max(0, intervalDays)),
+            due: due,
             stability: stability,
             difficulty: difficulty
         )
@@ -351,8 +356,9 @@ struct ReviewState: Codable, Equatable {
     /// implicitly; they are recorded separately, already net of per-word
     /// accidental forgiveness.
     ///
-    /// Again never resets: reps stays, lapses += 1, and a mature card
-    /// (stability or intervalDays >= 7) reschedules 1 day out.
+    /// Textbook FSRS: Again routes through relearning steps (due back in
+    /// ~10 minutes), reps stays, lapses += 1. The due comes from the library
+    /// card in all cases.
     func advanced(with grade: Grade, mistakes: Int, retention: Double = FSRSCore.defaultRetention, now: Date = Date()) -> ReviewState {
         var r = self
         r.updatedAt = now
@@ -372,15 +378,11 @@ struct ReviewState: Codable, Equatable {
         if grade == .again {
             r.lapses += 1
             // No rep reset (FSRS has no reps concept); keep reps as-is.
-            r.intervalDays = outcome.intervalDays
-            r.due = outcome.intervalDays < 1
-                ? now.addingTimeInterval(10 * 60) // retry in ~10 min
-                : Self.endOfDay(afterDays: outcome.intervalDays, from: now)
         } else {
             r.reps += 1
-            r.intervalDays = outcome.intervalDays
-            r.due = Self.endOfDay(afterDays: outcome.intervalDays, from: now)
         }
+        r.intervalDays = outcome.intervalDays
+        r.due = outcome.due
         return r
     }
 
@@ -388,12 +390,6 @@ struct ReviewState: Codable, Equatable {
     /// during migration. Schedules at default retention (0.9).
     func advanced(with grade: Grade, mistakes: Int, now: Date = Date()) -> ReviewState {
         advanced(with: grade, mistakes: mistakes, retention: FSRSCore.defaultRetention, now: now)
-    }
-
-    static func endOfDay(afterDays days: Int, from date: Date) -> Date {
-        let cal = Calendar.current
-        let start = cal.startOfDay(for: date)
-        return cal.date(byAdding: .day, value: days, to: start) ?? date
     }
 }
 

@@ -38,7 +38,7 @@ HOW IT WORKS
 • When done, see mistakes plus a suggested grade. Your grade decides the schedule — mistakes never auto-grade. Every grade has an 8-second Undo.
 
 REAL SPACED REPETITION
-Every rep ends in an explicit grade → FSRS stability + difficulty (Again retries today for new cards and tomorrow for mature ones; higher retention targets schedule tighter reviews). Due means end-of-day + interval. Only your grade moves the schedule.
+Every rep ends in an explicit grade → FSRS stability + difficulty (lapses come back in ~10 minutes through relearning steps; higher retention targets schedule tighter reviews). Due means the scheduled time — minutes away while a card is still being learned, days away once it graduates. Only your grade moves the schedule.
 
 ESV-ONLY, LEGALLY
 Only the English Standard Version. ESV text © Crossway is never bundled — the app ships with two short public-domain sample verses so it works offline, and fetches real ESV passages at runtime through the built-in secure service (cached for offline review). No setup needed, no key ever lives on-device.
