@@ -3,7 +3,9 @@ build/
 DerivedData/
 *.xcuserstate
 *.xcuserdata/
-VerseLoop.xcodeproj/project.xcworkspace/
+# Xcode Cloud requires the committed SPM lockfile, so only the user-specific
+# parts of the auto-generated project workspace are ignored.
+VerseLoop.xcodeproj/project.xcworkspace/xcuserdata/
 node_modules/
 .dev.vars
 .wrangler/
