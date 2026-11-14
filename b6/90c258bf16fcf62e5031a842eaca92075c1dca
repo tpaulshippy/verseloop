@@ -1,0 +1,14 @@
+VerseLoop/VerseStore.swift
+  h_6bbd00fe0a456a 537-543,548,718
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b690c258bf16fcf62e5031a842eaca92075c1dca",
+  "prompts": {},
+  "humans": {
+    "h_6bbd00fe0a456a": {
+      "author": "Paul Shippy <pshippy@gmail.com>"
+    }
+  }
+}
