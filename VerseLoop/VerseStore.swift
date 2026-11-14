@@ -534,12 +534,18 @@ final class VerseStore: ObservableObject {
         history = Array(history.sorted { $0.reviewedAt < $1.reviewedAt }.suffix(Self.maxHistoryEntries))
     }
 
+    /// The full library as a version-4 envelope. Single construction site
+    /// shared by encode (save/export) and push (sync) so the two can never
+    /// drift apart.
+    private var libraryEnvelope: LibraryEnvelope {
+        LibraryEnvelope(version: 4, verses: verses, reviews: Array(reviews.values), deleted: deleted, history: history, undoneLogIDs: undoneLogIDs)
+    }
+
     /// Encode the full library as version-4 JSON, tombstones included, so
     /// undone grades survive save / export / push and can't be resurrected
     /// by the next pull.
     private func encodeLibraryData() throws -> Data {
-        let env = LibraryEnvelope(version: 4, verses: verses, reviews: Array(reviews.values), deleted: deleted, history: history, undoneLogIDs: undoneLogIDs)
-        return try JSONEncoder().encode(env)
+        return try JSONEncoder().encode(libraryEnvelope)
     }
 
     /// Decode a blob written by encodeLibraryData (older envelopes without
@@ -709,8 +715,7 @@ final class VerseStore: ObservableObject {
             req.timeoutInterval = 15
             let code = syncCode.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !code.isEmpty else { throw SyncError.noCode }
-            let envelope = LibraryEnvelope(version: 4, verses: verses, reviews: Array(reviews.values), deleted: deleted, history: history, undoneLogIDs: undoneLogIDs)
-            req.httpBody = try JSONEncoder().encode(SyncCrypto.seal(envelope, code: code))
+            req.httpBody = try JSONEncoder().encode(SyncCrypto.seal(libraryEnvelope, code: code))
             let (_, resp) = try await URLSession.shared.data(for: req)
             guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw SyncError.server("HTTP \((resp as? HTTPURLResponse)?.statusCode ?? -1)") }
             lastSyncAt = Date()
