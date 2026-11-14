@@ -45,7 +45,7 @@ struct FlowLayout: Layout {
 /// - right character -> appears; wrong -> buzz, red mistake, move on
 /// - every mistake carries its own "accidental?" forgiveness toggle
 /// - mistake count shown instead of a progress bar
-/// - grade is ALWAYS explicit (Again/Hard/Good/Easy) -> true SM-2
+/// - grade is ALWAYS explicit (Again/Hard/Good/Easy) -> FSRS scheduling
 /// - every grade has an 8s Undo
 struct ReviewView: View {
     @EnvironmentObject var store: VerseStore
@@ -329,7 +329,12 @@ struct ReviewView: View {
     // MARK: grading (reference revealed only now that the test is over)
 
     private var gradeBlock: some View {
-        VStack(spacing: 10) {
+        // One shared helper drives both sides: these previews call
+        // previewIntervals(retention:) and grading calls advanced() with the
+        // same store.desiredRetention — same math, never duplicated.
+        let previews = Dictionary(uniqueKeysWithValues:
+            store.review(for: verse.id).previewIntervals(retention: store.desiredRetention))
+        return VStack(spacing: 10) {
             HStack {
                 Image(systemName: mistakeCount == 0 ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                     .foregroundStyle(mistakeCount == 0 ? .green : .orange)
@@ -346,11 +351,19 @@ struct ReviewView: View {
                     Button {
                         grade(g)
                     } label: {
-                        Label(g.title, systemImage: g.systemImage)
-                            .frame(maxWidth: .infinity, minHeight: 46)
+                        VStack(spacing: 2) {
+                            Label(g.title, systemImage: g.systemImage)
+                            Text(Self.intervalPreview(previews[g] ?? 0))
+                                .font(.caption2)
+                                .opacity(0.85)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 54)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(tint(for: g))
+                    // Explicit label keeps the UI-test hook (buttons["Good"])
+                    // stable now that the button carries a preview subtitle.
+                    .accessibilityLabel(g.title)
                 }
             }
         }
@@ -460,6 +473,12 @@ struct ReviewView: View {
         case .good: return .blue
         case .easy: return .green
         }
+    }
+
+    /// Short preview caption for a scheduled interval: same-day retries show
+    /// "~10m" (interval 0 grades due in ~10 minutes), otherwise "Nd".
+    private static func intervalPreview(_ days: Int) -> String {
+        days <= 0 ? "~10m" : "\(days)d"
     }
 
     // MARK: typing engine — one stream, words then reference

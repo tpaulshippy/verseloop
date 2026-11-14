@@ -67,7 +67,7 @@ final class ReminderRouter: NSObject, UNUserNotificationCenterDelegate {
     }
 }
 
-/// Single source of truth: verses + SM-2 reviews, JSON-persisted, exportable,
+/// Single source of truth: verses + FSRS reviews, JSON-persisted, exportable,
 /// and syncable through the free Cloudflare Worker (no Apple entitlements needed).
 @MainActor
 final class VerseStore: ObservableObject {
@@ -77,6 +77,9 @@ final class VerseStore: ObservableObject {
     @Published var syncMessage: String = ""
     /// Tombstones so deletes propagate instead of resurrecting on pull.
     var deleted: [DeletedEntry] = []
+    /// FSRS review history (v3+). Undone grades are removed so they never
+    /// pollute training data. Synced/merged as an id-union (entries immutable).
+    @Published var history: [ReviewLogEntry] = []
 
     @Published var autoSyncEnabled: Bool {
         didSet {
@@ -115,12 +118,31 @@ final class VerseStore: ObservableObject {
     static let defaultGoodThreshold = 0.05
     static let defaultHardThreshold = 0.15
 
-    /// When true, list rows show raw SM-2 internals (E2.50 · ×4).
+    /// When true, list rows show scheduler internals (S7.5d · D6.2 · ×4).
     /// Default false: rows show "Learning · every 3d".
     @Published var showSchedulerDetails: Bool = false {
         didSet {
             UserDefaults.standard.set(showSchedulerDetails, forKey: "verseloop.showSchedulerDetails")
         }
+    }
+
+    /// Desired retention (probability of recall at due time). Applies to
+    /// future grades only — changing it never reschedules existing dues.
+    static let minRetention = 0.80
+    static let maxRetention = 0.97
+    @Published var desiredRetention: Double = FSRSCore.defaultRetention {
+        didSet {
+            let clamped = min(max(desiredRetention, Self.minRetention), Self.maxRetention)
+            if clamped != desiredRetention { desiredRetention = clamped; return }
+            UserDefaults.standard.set(desiredRetention, forKey: "desiredRetention")
+        }
+    }
+
+    /// Clamp + persist. No rescheduling: only future grade() calls use it.
+    func setDesiredRetention(_ value: Double) {
+        desiredRetention = min(max(value, Self.minRetention), Self.maxRetention)
+        UserDefaults.standard.set(desiredRetention, forKey: "desiredRetention")
+        save()
     }
 
     // MARK: - Reminders (local notifications, no server involved)
@@ -184,6 +206,9 @@ final class VerseStore: ObservableObject {
         let verseId: UUID
         let previous: ReviewState
         let grade: Grade
+        /// History entry appended by grade(); removed on undo so undone
+        /// grades never pollute training data.
+        let logEntryId: UUID
     }
     private var gradeUndoStack: [GradeUndo] = []
     @Published var undoToast: String? // "Graded Good — Undo" with auto-dismiss handled by view
@@ -208,6 +233,11 @@ final class VerseStore: ObservableObject {
         self.hardThreshold = hard ?? Self.defaultHardThreshold
         if self.hardThreshold < self.goodThreshold { self.hardThreshold = self.goodThreshold }
         self.showSchedulerDetails = UserDefaults.standard.bool(forKey: "verseloop.showSchedulerDetails")
+        if let stored = UserDefaults.standard.object(forKey: "desiredRetention") as? Double {
+            self.desiredRetention = min(max(stored, Self.minRetention), Self.maxRetention)
+        } else {
+            self.desiredRetention = FSRSCore.defaultRetention
+        }
         self.remindersEnabled = UserDefaults.standard.bool(forKey: "verseloop.remindersEnabled")
         if let raw = UserDefaults.standard.string(forKey: "verseloop.reminderMode"),
            let m = ReminderMode(rawValue: raw) {
@@ -312,6 +342,7 @@ final class VerseStore: ObservableObject {
     func deleteVerse(_ verse: Verse) {
         verses.removeAll { $0.id == verse.id }
         reviews.removeValue(forKey: verse.id)
+        history.removeAll { $0.verseId == verse.id }
         let now = Date()
         deleted.removeAll { $0.verseId == verse.id }
         deleted.append(DeletedEntry(verseId: verse.id, deletedAt: now))
@@ -322,11 +353,15 @@ final class VerseStore: ObservableObject {
 
     /// Explicit grade after a typing pass. `mistakes` is the mistake count
     /// AFTER per-word accidental forgiveness, so stray keystrokes never
-    /// silently tank the ease factor.
+    /// silently shrink the next interval.
     func grade(_ verseId: UUID, grade: Grade, mistakes: Int) {
         let current = review(for: verseId)
-        gradeUndoStack.append(GradeUndo(verseId: verseId, previous: current, grade: grade))
-        reviews[verseId] = current.advanced(with: grade, mistakes: mistakes, now: Date())
+        let now = Date()
+        let next = current.advanced(with: grade, mistakes: mistakes, retention: desiredRetention, now: now)
+        let entry = ReviewLogEntry(verseId: verseId, reviewedAt: now, grade: grade, mistakes: mistakes, prevIntervalDays: current.intervalDays, nextIntervalDays: next.intervalDays, prevStability: current.stability, nextStability: next.stability, retention: desiredRetention)
+        gradeUndoStack.append(GradeUndo(verseId: verseId, previous: current, grade: grade, logEntryId: entry.id))
+        reviews[verseId] = next
+        history.append(entry)
         undoToast = "Graded \(grade.title) · \(mistakes) mistake\(mistakes == 1 ? "" : "s") — Undo"
         save()
         refreshReminders()
@@ -338,6 +373,7 @@ final class VerseStore: ObservableObject {
         var restored = last.previous
         restored.updatedAt = Date()
         reviews[last.verseId] = restored
+        history.removeAll { $0.id == last.logEntryId }
         undoToast = nil
         save()
         refreshReminders()
@@ -455,6 +491,7 @@ final class VerseStore: ObservableObject {
         verses = []
         reviews = [:]
         deleted = []
+        history = []
         gradeUndoStack = []
         undoToast = nil
         lastSyncAt = nil
@@ -477,7 +514,7 @@ final class VerseStore: ObservableObject {
     }
 
     func save() {
-        let env = LibraryEnvelope(version: 2, verses: verses, reviews: Array(reviews.values), deleted: deleted)
+        let env = LibraryEnvelope(version: 3, verses: verses, reviews: Array(reviews.values), deleted: deleted, history: history)
         do {
             let data = try JSONEncoder().encode(env)
             try data.write(to: libraryURL, options: .atomic)
@@ -493,6 +530,7 @@ final class VerseStore: ObservableObject {
         verses = env.verses
         reviews = Dictionary(uniqueKeysWithValues: env.reviews.map { ($0.verseId, $0) })
         deleted = env.deleted
+        history = env.history
         return true
     }
 
@@ -507,13 +545,14 @@ final class VerseStore: ObservableObject {
         verses = seeds
         reviews = Dictionary(uniqueKeysWithValues: seeds.map { ($0.id, ReviewState(verseId: $0.id, ease: 2.5, intervalDays: 0, due: now, reps: 0, lapses: 0, totalHints: 0, lastGrade: nil, updatedAt: now)) })
         deleted = []
+        history = []
         save()
     }
 
     // MARK: - Export / Import (fixes "no way to get my data out")
 
     func exportURL() throws -> URL {
-        let env = LibraryEnvelope(version: 2, verses: verses, reviews: Array(reviews.values), deleted: deleted)
+        let env = LibraryEnvelope(version: 3, verses: verses, reviews: Array(reviews.values), deleted: deleted, history: history)
         let data = try JSONEncoder().encode(env)
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("verseloop-export.json")
         try data.write(to: url, options: .atomic)
@@ -631,7 +670,7 @@ final class VerseStore: ObservableObject {
             req.httpMethod = "PUT"
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.timeoutInterval = 15
-            let inner = LibraryEnvelope(version: 2, verses: verses, reviews: Array(reviews.values), deleted: deleted)
+            let inner = LibraryEnvelope(version: 3, verses: verses, reviews: Array(reviews.values), deleted: deleted, history: history)
             let code = syncCode.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !code.isEmpty else { throw SyncError.noCode }
             req.httpBody = try JSONEncoder().encode(SyncCrypto.seal(inner, code: code))
@@ -709,6 +748,23 @@ final class VerseStore: ObservableObject {
             }
         }
         deleted = kept
+        // History: id-union (entries immutable). On id conflict keep the
+        // newer reviewedAt. Then drop entries for tombstoned verses so a
+        // delete isn't resurrected as orphan history on the next pull.
+        var hById: [UUID: ReviewLogEntry] = Dictionary(uniqueKeysWithValues: history.map { ($0.id, $0) })
+        for e in env.history {
+            if let local = hById[e.id] {
+                if e.reviewedAt > local.reviewedAt { hById[e.id] = e }
+            } else {
+                hById[e.id] = e
+            }
+        }
+        let tombSet = Set(tombById.keys)
+        history = hById.values.filter { e in
+            guard tombSet.contains(e.verseId) else { return true }
+            if let v = vById[e.verseId] { return v.updatedAt > (tombById[e.verseId] ?? .distantPast) }
+            return false
+        }
     }
 
     func esvService() -> ESVService {

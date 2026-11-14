@@ -14,7 +14,7 @@ Right character → it appears. Wrong → a haptic buzz, a red mistake, and you 
 
 - Single due-sorted **Loop**: one verse at a time
 - Wrong letter **buzzes + marks a red mistake** — forgive any as **accidental**
-- Every rep ends in **Again / Hard / Good / Easy** → real SM-2 ease + intervals
+- Every rep ends in **Again / Hard / Good / Easy** → FSRS stability + intervals
 - **Mistake count** in the header, net of forgiven slips, plus a suggested grade
 - **JSON export/import + optional encrypted sync** — same verses on two devices
 
