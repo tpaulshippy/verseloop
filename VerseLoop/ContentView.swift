@@ -182,7 +182,6 @@ struct DueBadge: View {
     private func dueText(_ r: ReviewState) -> String {
         guard r.due > now else { return "due now" }
         let mins = Int(r.due.timeIntervalSince(now) / 60)
-        if mins < 1 { return "moments" }
         if mins < 60 { return ReviewState.relativeDueText(due: r.due, now: now) }
         let cal = Calendar.current
         if cal.isDateInTomorrow(r.due) { return "tomorrow" }

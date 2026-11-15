@@ -314,7 +314,9 @@ struct ReviewState: Codable, Equatable {
     /// for tick boundaries).
     static func relativeDueText(due: Date, now: Date) -> String {
         guard due > now else { return "due now" }
-        let minutes = max(1, Int((due.timeIntervalSince(now) / 60).rounded()))
+        let delta = due.timeIntervalSince(now)
+        guard delta >= 60 else { return "moments" }
+        let minutes = max(1, Int((delta / 60).rounded()))
         return "in \(minutes) min"
     }
 
