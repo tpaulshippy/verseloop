@@ -329,7 +329,12 @@ struct ReviewView: View {
     // MARK: grading (reference revealed only now that the test is over)
 
     private var gradeBlock: some View {
-        VStack(spacing: 10) {
+        // Single `now` for both the hypothetical dues and their formatting,
+        // so Again on a fresh card previews exactly "10m" (no 599s floor slip).
+        let now = Date()
+        let dues = Dictionary(uniqueKeysWithValues: store.review(for: verse.id)
+            .previewDueDates(mistakes: mistakeCount, now: now).map { ($0.grade, $0.due) })
+        return VStack(spacing: 10) {
             HStack {
                 Image(systemName: mistakeCount == 0 ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                     .foregroundStyle(mistakeCount == 0 ? .green : .orange)
@@ -343,17 +348,63 @@ struct ReviewView: View {
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 ForEach(Grade.allCases, id: \.self) { g in
+                    let due = dues[g] ?? now
                     Button {
                         grade(g)
                     } label: {
-                        Label(g.title, systemImage: g.systemImage)
-                            .frame(maxWidth: .infinity, minHeight: 46)
+                        VStack(spacing: 2) {
+                            Label(g.title, systemImage: g.systemImage)
+                            Text(previewLabel(for: due, now: now))
+                                .font(.caption)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 46)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(tint(for: g))
+                    .accessibilityLabel(g.title)
+                    .accessibilityHint(previewHint(for: due, now: now))
                 }
             }
         }
+    }
+
+    /// Grade-button preview subtitle from the actual due delta:
+    /// under 60 min -> "Nm", under 24h -> "Nh" (rounded down, minimum "1h"),
+    /// else calendar-day count -> "Nd".
+    private func previewLabel(for due: Date, now: Date) -> String {
+        let delta = max(0, due.timeIntervalSince(now))
+        if delta < 3_600 {
+            return "\(max(1, Int(delta / 60)))m"
+        }
+        if delta < 86_400 {
+            return "\(max(1, Int(delta / 3_600)))h"
+        }
+        return "\(max(1, dayCount(from: now, to: due)))d"
+    }
+
+    /// VoiceOver words for the preview subtitle. Singulars handled
+    /// ("1 minute" / "1 hour" / "1 day", never "1 minutes").
+    private func previewHint(for due: Date, now: Date) -> String {
+        let delta = max(0, due.timeIntervalSince(now))
+        if delta < 3_600 {
+            let m = max(1, Int(delta / 60))
+            return "Reviews in \(m) minute\(m == 1 ? "" : "s")"
+        }
+        if delta < 86_400 {
+            let h = max(1, Int(delta / 3_600))
+            return "Reviews in \(h) hour\(h == 1 ? "" : "s")"
+        }
+        let d = max(1, dayCount(from: now, to: due))
+        return "Reviews in \(d) day\(d == 1 ? "" : "s")"
+    }
+
+    /// Calendar-day span between the two midnights, so a +4-day due reads
+    /// "4d" no matter what time of day the preview renders.
+    private func dayCount(from now: Date, to due: Date) -> Int {
+        let cal = Calendar.current
+        return cal.dateComponents([.day],
+                                  from: cal.startOfDay(for: now),
+                                  to: cal.startOfDay(for: due)).day ?? Int(due.timeIntervalSince(now) / 86_400)
     }
 
     private var gradedBlock: some View {
@@ -449,7 +500,12 @@ struct ReviewView: View {
 
     private var nextDueText: String {
         let r = store.review(for: verse.id)
-        if r.intervalDays <= 0 { return "~10 min" }
+        if r.intervalDays <= 0 {
+            // Intraday retry (Again): read the exact due, rounded so a
+            // just-graded card still reads "in 10 min", never "in 9 min".
+            let minutes = max(1, Int((r.due.timeIntervalSince(Date()) / 60).rounded()))
+            return "in \(minutes) min"
+        }
         return r.due.formatted(date: .abbreviated, time: .omitted)
     }
 

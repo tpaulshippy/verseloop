@@ -209,6 +209,16 @@ struct ReviewState: Codable, Equatable {
         return r
     }
 
+    /// Minute-precise hypothetical dues, one per grade, reusing the SAME
+    /// `advanced` scheduling math (no duplicated logic). Drives the
+    /// grade-button preview subtitles in ReviewView, so the buttons show
+    /// the actual due delta ("10m", "3h", "4d") instead of a collapsed "~10m".
+    /// `mistakes` is threaded through for fidelity but never moves the
+    /// schedule — only explicit grades do.
+    func previewDueDates(mistakes: Int = 0, now: Date = Date()) -> [(grade: Grade, due: Date)] {
+        Grade.allCases.map { g in (grade: g, due: advanced(with: g, mistakes: mistakes, now: now).due) }
+    }
+
     static func endOfDay(afterDays days: Int, from date: Date) -> Date {
         let cal = Calendar.current
         let start = cal.startOfDay(for: date)

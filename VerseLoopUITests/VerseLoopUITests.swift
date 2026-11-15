@@ -65,6 +65,10 @@ final class VerseLoopUITests: XCTestCase {
         field.typeText("P231")
         XCTAssertTrue(app.staticTexts["Suggested: Easy — but your grade decides, as always."].waitForExistence(timeout: 10))
 
+        // Grade previews are minute-precise (Again → "10m" on this young card).
+        XCTAssertTrue(app.staticTexts["10m"].waitForExistence(timeout: 5))
+        snap(app, "04-grade-previews")
+
         // Grade, undo the grade, re-grade, advance
         app.buttons["Good"].tap()
         XCTAssertTrue(app.buttons["Undo grade (8s)"].waitForExistence(timeout: 5))
