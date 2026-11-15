@@ -329,11 +329,14 @@ struct ReviewView: View {
     // MARK: grading (reference revealed only now that the test is over)
 
     private var gradeBlock: some View {
+        // Single `now` for both the hypothetical dues and their formatting,
+        // so an intraday preview never slips a minute (no 599s floor slip).
         // One shared helper drives both sides: these previews call
-        // previewIntervals(retention:) and grading calls advanced() with the
+        // previewDueDates(retention:) and grading calls advanced() with the
         // same store.desiredRetention — same math, never duplicated.
-        let previews = Dictionary(uniqueKeysWithValues:
-            store.review(for: verse.id).previewIntervals(retention: store.desiredRetention))
+        let now = Date()
+        let dues = Dictionary(uniqueKeysWithValues:
+            store.review(for: verse.id).previewDueDates(retention: store.desiredRetention, now: now).map { ($0.grade, $0.due) })
         return VStack(spacing: 10) {
             HStack {
                 Image(systemName: mistakeCount == 0 ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
@@ -348,12 +351,13 @@ struct ReviewView: View {
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 ForEach(Grade.allCases, id: \.self) { g in
+                    let due = dues[g] ?? now
                     Button {
                         grade(g)
                     } label: {
                         VStack(spacing: 2) {
                             Label(g.title, systemImage: g.systemImage)
-                            Text(Self.intervalPreview(previews[g] ?? 0))
+                            Text(previewLabel(for: due, now: now))
                                 .font(.caption2)
                                 .opacity(0.85)
                         }
@@ -364,10 +368,49 @@ struct ReviewView: View {
                     // Explicit label keeps the UI-test hook (buttons["Good"])
                     // stable now that the button carries a preview subtitle.
                     .accessibilityLabel(g.title)
-                    .accessibilityHint((previews[g] ?? 0) <= 0 ? "Reviews in ~10 minutes" : "Reviews in \(previews[g] ?? 0)d")
+                    .accessibilityHint(previewHint(for: due, now: now))
                 }
             }
         }
+    }
+
+    /// Grade-button preview subtitle from the actual due delta:
+    /// under 60 min -> "Nm", under 24h -> "Nh" (floored, minimum "1h"),
+    /// else calendar-midnight day span -> "Nd".
+    private func previewLabel(for due: Date, now: Date) -> String {
+        let delta = max(0, due.timeIntervalSince(now))
+        if delta < 3_600 {
+            return "\(max(1, Int(delta / 60)))m"
+        }
+        if delta < 86_400 {
+            return "\(max(1, Int(delta / 3_600)))h"
+        }
+        return "\(max(1, dayCount(from: now, to: due)))d"
+    }
+
+    /// VoiceOver words for the preview subtitle, with correct singulars
+    /// ("Reviews in 1 minute/hour/day").
+    private func previewHint(for due: Date, now: Date) -> String {
+        let delta = max(0, due.timeIntervalSince(now))
+        if delta < 3_600 {
+            let m = max(1, Int(delta / 60))
+            return "Reviews in \(m) minute\(m == 1 ? "" : "s")"
+        }
+        if delta < 86_400 {
+            let h = max(1, Int(delta / 3_600))
+            return "Reviews in \(h) hour\(h == 1 ? "" : "s")"
+        }
+        let d = max(1, dayCount(from: now, to: due))
+        return "Reviews in \(d) day\(d == 1 ? "" : "s")"
+    }
+
+    /// Calendar-day span between the two midnights, so a +4-day due reads
+    /// "4d" no matter what time of day the preview renders.
+    private func dayCount(from now: Date, to due: Date) -> Int {
+        let cal = Calendar.current
+        return cal.dateComponents([.day],
+                                  from: cal.startOfDay(for: now),
+                                  to: cal.startOfDay(for: due)).day ?? Int(due.timeIntervalSince(now) / 86_400)
     }
 
     private var gradedBlock: some View {
@@ -463,7 +506,12 @@ struct ReviewView: View {
 
     private var nextDueText: String {
         let r = store.review(for: verse.id)
-        if r.intervalDays <= 0 { return "~10 min" }
+        if r.intervalDays <= 0 {
+            // Intraday retry (Again): read the exact due, rounded so a
+            // just-graded card still reads "in 10 min", never "in 9 min".
+            let minutes = max(1, Int((r.due.timeIntervalSince(Date()) / 60).rounded()))
+            return "in \(minutes) min"
+        }
         return r.due.formatted(date: .abbreviated, time: .omitted)
     }
 
@@ -474,12 +522,6 @@ struct ReviewView: View {
         case .good: return .blue
         case .easy: return .green
         }
-    }
-
-    /// Short preview caption for a scheduled interval: same-day retries show
-    /// "~10m" (interval 0 grades due in ~10 minutes), otherwise "Nd".
-    private static func intervalPreview(_ days: Int) -> String {
-        days <= 0 ? "~10m" : "\(days)d"
     }
 
     // MARK: typing engine — one stream, words then reference

@@ -298,6 +298,14 @@ struct ReviewState: Codable, Equatable {
         Grade.allCases.map { grade in (grade, hypotheticalInterval(for: grade, retention: retention, now: now)) }
     }
 
+    /// Minute-precise hypothetical dues, one per grade, reusing the SAME
+    /// `hypotheticalOutcome` path as `advanced` (no duplicated scheduling
+    /// math), so previews can never drift from the applied grade. Drives the
+    /// grade-button preview subtitles in ReviewView ("10m", "3h", "4d").
+    func previewDueDates(retention: Double = FSRSCore.defaultRetention, now: Date = Date()) -> [(grade: Grade, due: Date)] {
+        Grade.allCases.map { grade in (grade: grade, due: hypotheticalOutcome(for: grade, retention: retention, now: now).due) }
+    }
+
     /// Transient library Card rebuilt from our stored fields on every call —
     /// the library is stateless, so this is the only handoff. Reviewed cards
     /// (stability + difficulty present) resume in their persisted library
@@ -325,14 +333,15 @@ struct ReviewState: Codable, Equatable {
         return Card(due: due, state: .new, lastReview: nil)
     }
 
-    /// One private hypothetical path shared by `previewIntervals` and
-    /// `advanced` so previews can never drift from the applied grade. Runs
+    /// One private hypothetical path shared by `previewIntervals`,
+    /// `previewDueDates`, and `advanced` so previews can never drift from
+    /// the applied grade. Runs
     /// the transient card through the library and takes the library card's
     /// due verbatim (textbook: minute precision while learning/relearning,
     /// day precision once graduated). `intervalDays` preserves the library's
     /// `scheduledDays` (rounded to nearest, floor 0, capped): intraday
     /// learning/relearning steps report `scheduledDays` 0, so an intraday
-    /// due crossing midnight still yields 0 (displayed as "~10m") instead of
+    /// due crossing midnight still yields 0 (previewed as "Nm") instead of
     /// becoming a one-day interval via calendar-day math.
     private struct HypotheticalOutcome {
         var intervalDays: Int
