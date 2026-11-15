@@ -1,0 +1,20 @@
+VerseLoop/ContentView.swift
+  h_6bbd00fe0a456a 180-181,183,186
+VerseLoop/Models.swift
+  h_6bbd00fe0a456a 309-320
+VerseLoop/ReviewView.swift
+  h_6bbd00fe0a456a 377-387,390,393-404,409-410,412-415,522-524
+VerseLoopUITests/VerseLoopUITests.swift
+  h_6bbd00fe0a456a 68-75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a574811e443dd2c9e69e5bf71e69664381d1b8b9",
+  "prompts": {},
+  "humans": {
+    "h_6bbd00fe0a456a": {
+      "author": "Paul Shippy <pshippy@gmail.com>"
+    }
+  }
+}
