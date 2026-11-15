@@ -374,34 +374,46 @@ struct ReviewView: View {
         }
     }
 
-    /// Grade-button preview subtitle from the actual due delta:
-    /// under 60 min -> "Nm", under 24h -> "Nh" (floored, minimum "1h"),
-    /// else calendar-midnight day span -> "Nd".
-    private func previewLabel(for due: Date, now: Date) -> String {
+    /// One derivation for both the visible preview subtitle and the
+    /// VoiceOver hint: under 60 min -> minutes, under 24h -> hours (floored,
+    /// minimum "1h"), else the calendar-midnight day span. The minute bucket
+    /// rounds to nearest to agree with the shared `relativeDueText`.
+    private enum PreviewSpan {
+        case minutes(Int)
+        case hours(Int)
+        case days(Int)
+    }
+
+    private func previewSpan(for due: Date, now: Date) -> PreviewSpan {
         let delta = max(0, due.timeIntervalSince(now))
         if delta < 3_600 {
-            return "\(max(1, Int(delta / 60)))m"
+            return .minutes(max(1, Int((delta / 60).rounded())))
         }
         if delta < 86_400 {
-            return "\(max(1, Int(delta / 3_600)))h"
+            return .hours(max(1, Int(delta / 3_600)))
         }
-        return "\(max(1, dayCount(from: now, to: due)))d"
+        return .days(max(1, dayCount(from: now, to: due)))
+    }
+
+    /// Grade-button preview subtitle from the actual due delta ("10m",
+    /// "3h", "4d"). Buckets come from `previewSpan`, shared with the hint.
+    private func previewLabel(for due: Date, now: Date) -> String {
+        switch previewSpan(for: due, now: now) {
+        case .minutes(let m): return "\(m)m"
+        case .hours(let h): return "\(h)h"
+        case .days(let d): return "\(d)d"
+        }
     }
 
     /// VoiceOver words for the preview subtitle, with correct singulars
-    /// ("Reviews in 1 minute/hour/day").
+    /// ("Reviews in 1 minute/hour/day"). Buckets come from `previewSpan`,
+    /// shared with the label, so the two can never disagree.
     private func previewHint(for due: Date, now: Date) -> String {
-        let delta = max(0, due.timeIntervalSince(now))
-        if delta < 3_600 {
-            let m = max(1, Int(delta / 60))
-            return "Reviews in \(m) minute\(m == 1 ? "" : "s")"
+        switch previewSpan(for: due, now: now) {
+        case .minutes(let m): return "Reviews in \(m) minute\(m == 1 ? "" : "s")"
+        case .hours(let h): return "Reviews in \(h) hour\(h == 1 ? "" : "s")"
+        case .days(let d): return "Reviews in \(d) day\(d == 1 ? "" : "s")"
         }
-        if delta < 86_400 {
-            let h = max(1, Int(delta / 3_600))
-            return "Reviews in \(h) hour\(h == 1 ? "" : "s")"
-        }
-        let d = max(1, dayCount(from: now, to: due))
-        return "Reviews in \(d) day\(d == 1 ? "" : "s")"
     }
 
     /// Calendar-day span between the two midnights, so a +4-day due reads
@@ -507,10 +519,9 @@ struct ReviewView: View {
     private var nextDueText: String {
         let r = store.review(for: verse.id)
         if r.intervalDays <= 0 {
-            // Intraday retry (Again): read the exact due, rounded so a
-            // just-graded card still reads "in 10 min", never "in 9 min".
-            let minutes = max(1, Int((r.due.timeIntervalSince(Date()) / 60).rounded()))
-            return "in \(minutes) min"
+            // Intraday retry: one shared formatter with the Loop row, so the
+            // banner and the row always agree ("due now" once it has passed).
+            return ReviewState.relativeDueText(due: r.due, now: Date())
         }
         return r.due.formatted(date: .abbreviated, time: .omitted)
     }

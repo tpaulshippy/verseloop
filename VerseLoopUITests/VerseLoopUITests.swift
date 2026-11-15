@@ -65,9 +65,14 @@ final class VerseLoopUITests: XCTestCase {
         field.typeText("P231")
         XCTAssertTrue(app.staticTexts["Suggested: Easy — but your grade decides, as always."].waitForExistence(timeout: 10))
 
-        // Grade previews are minute-precise dues from the real FSRS schedule
-        // (this young card is still in learning steps: Again → "1m").
-        XCTAssertTrue(app.buttons["Again"].staticTexts["1m"].waitForExistence(timeout: 5))
+        // Grade previews are minute-precise dues from the real FSRS schedule.
+        // Again is always intraday on this card: "1m" from learning steps on
+        // a young card, "10m" relearning once it graduates — either way an
+        // exact minute value, never the old "~10m" approximation.
+        let againButton = app.buttons["Again"]
+        XCTAssertTrue(againButton.waitForExistence(timeout: 5))
+        let againLabels = againButton.staticTexts.allElementsBoundByIndex.map(\.label)
+        XCTAssertTrue(againLabels.contains("1m") || againLabels.contains("10m"), "Again preview labels: \(againLabels)")
         snap(app, "04-grade-previews")
 
         // Grade, undo the grade, re-grade, advance

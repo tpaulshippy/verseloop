@@ -177,10 +177,13 @@ struct DueBadge: View {
     }
 
     /// Honest relative label. Never "in 0d": a retry minutes away says so.
+    /// Past-due rows never reach here (DueBadge pre-empts with DUE), but the
+    /// guard keeps the helper consistent at tick boundaries.
     private func dueText(_ r: ReviewState) -> String {
+        guard r.due > now else { return "due now" }
         let mins = Int(r.due.timeIntervalSince(now) / 60)
         if mins < 1 { return "moments" }
-        if mins < 60 { return "in \(mins) min" }
+        if mins < 60 { return ReviewState.relativeDueText(due: r.due, now: now) }
         let cal = Calendar.current
         if cal.isDateInTomorrow(r.due) { return "tomorrow" }
         let days = cal.dateComponents([.day], from: cal.startOfDay(for: Date()), to: cal.startOfDay(for: r.due)).day ?? r.intervalDays

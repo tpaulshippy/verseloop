@@ -306,6 +306,18 @@ struct ReviewState: Codable, Equatable {
         Grade.allCases.map { grade in (grade: grade, due: hypotheticalOutcome(for: grade, retention: retention, now: now).due) }
     }
 
+    /// Shared relative-due formatter for intraday dues. ROUNDING DECISION:
+    /// round-to-nearest everywhere, so a just-graded Again reads "in 10 min"
+    /// (never "in 9 min") identically in the Loop row and the graded banner.
+    /// Returns "due now" once the due has passed (Loop rows additionally
+    /// pre-empt with their own DUE badge; this is the belt-and-braces path
+    /// for tick boundaries).
+    static func relativeDueText(due: Date, now: Date) -> String {
+        guard due > now else { return "due now" }
+        let minutes = max(1, Int((due.timeIntervalSince(now) / 60).rounded()))
+        return "in \(minutes) min"
+    }
+
     /// Transient library Card rebuilt from our stored fields on every call —
     /// the library is stateless, so this is the only handoff. Reviewed cards
     /// (stability + difficulty present) resume in their persisted library
