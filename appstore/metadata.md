@@ -29,7 +29,7 @@ ESV-only memorization with real spaced repetition. Type first letters, forgive s
 ### Description (4000 chars)
 Start the day by memorizing ESV verses word-by-word — from first letters, with the reference tested last.
 
-Verse Loop Daily is a native, offline-first iOS app with zero dependencies for one workflow: a daily Loop of due verses, a forgiving first-letter tester, and real SM-2 spaced repetition driven by your own Again / Hard / Good / Easy grades.
+Verse Loop Daily is a native, offline-first iOS app (SwiftUI plus the swift-fsrs scheduler, no other dependencies) for one workflow: a daily Loop of due verses, a forgiving first-letter tester, and FSRS-inspired spaced repetition driven by your own Again / Hard / Good / Easy grades.
 
 HOW IT WORKS
 • Today tab shows your due-sorted Loop: Due / Total / Mastered at a glance.
@@ -38,7 +38,7 @@ HOW IT WORKS
 • When done, see mistakes plus a suggested grade. Your grade decides the schedule — mistakes never auto-grade. Every grade has an 8-second Undo.
 
 REAL SPACED REPETITION
-Every rep ends in an explicit grade → SM-2 ease + intervals (Again resets with 10-min retry; Hard ×1.2; Good 1d → 3d → ×ease; Easy 4d start with ease bonus). Due means end-of-day + interval. Only your grade moves the schedule.
+Every rep ends in an explicit grade → FSRS stability + difficulty (lapses come back in ~10 minutes through relearning steps; higher retention targets schedule tighter reviews). Due means the scheduled time — minutes away while a card is still being learned, days away once it graduates. Only your grade moves the schedule.
 
 ESV-ONLY, LEGALLY
 Only the English Standard Version. ESV text © Crossway is never bundled — the app ships with two short public-domain sample verses so it works offline, and fetches real ESV passages at runtime through the built-in secure service (cached for offline review). No setup needed, no key ever lives on-device.
@@ -50,7 +50,7 @@ YOUR DATA IS YOURS
 • Delete everything anytime: Settings → Delete All My Data removes local verses + history, deletes the cloud backup, and rotates the code. Full equivalent of account deletion — there are no accounts.
 
 BUILT FOR FOCUS
-Zero dependencies, SwiftUI only, no web views, no media. Cold start <1s. Full dark-mode support. iPhone SE to Pro Max.
+SwiftUI plus the swift-fsrs scheduler, no other dependencies, no web views, no media. Cold start <1s. Full dark-mode support. iPhone SE to Pro Max.
 
 Scripture quotations are from the ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission via the ESV API. All rights reserved.
 
@@ -64,7 +64,7 @@ bible,esv,scripture,memory,memorize,verses,spaced,repetition
   1. Today's Loop — due-sorted queue
   2. Type-the-first-letter tester
   3. Forgive accidental slips
-  4. Grade with SM-2 + 8s Undo
+  4. Grade with FSRS + 8s Undo
   5. Add verse with ESV fetch
   6. Settings — encrypted backup, export, Delete My Data
 - App Preview video: optional, skipped for v1.0.

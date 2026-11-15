@@ -177,10 +177,12 @@ struct DueBadge: View {
     }
 
     /// Honest relative label. Never "in 0d": a retry minutes away says so.
+    /// Past-due rows never reach here (DueBadge pre-empts with DUE), but the
+    /// guard keeps the helper consistent at tick boundaries.
     private func dueText(_ r: ReviewState) -> String {
+        guard r.due > now else { return "due now" }
         let mins = Int(r.due.timeIntervalSince(now) / 60)
-        if mins < 1 { return "moments" }
-        if mins < 60 { return "in \(mins) min" }
+        if mins < 60 { return ReviewState.relativeDueText(due: r.due, now: now) }
         let cal = Calendar.current
         if cal.isDateInTomorrow(r.due) { return "tomorrow" }
         let days = cal.dateComponents([.day], from: cal.startOfDay(for: Date()), to: cal.startOfDay(for: r.due)).day ?? r.intervalDays
@@ -315,6 +317,26 @@ struct SettingsView: View {
     @State private var showingDeleteConfirm = false
     @State private var isDeleting = false
 
+    /// One retention preset button. Two-line label (name + value) so all
+    /// three presets read fully on the iPhone SE (375pt) row, where
+    /// single-line titles ("Standard 9…") ellipsized despite scaling.
+    private func retentionPreset(title: String, value: Double) -> some View {
+        let parts = title.split(separator: " ")
+        let name = parts.dropLast().joined(separator: " ")
+        let pct = parts.last.map(String.init) ?? ""
+        return Button {
+            store.setDesiredRetention(value)
+        } label: {
+            VStack(spacing: 1) {
+                Text(name).font(.subheadline)
+                Text(pct).font(.caption).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .bold(abs(store.desiredRetention - value) < 0.005)
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -366,11 +388,40 @@ struct SettingsView: View {
                     Text("After a typing pass, 0 mistakes suggests Easy; a mistake rate at or under Good suggests Good, at or under Hard suggests Hard, above that Again — net of forgiven mistakes.")
                 }
                 Section {
+                    HStack {
+                        Text("Want to remember")
+                        Spacer()
+                        Text("\(Int((store.desiredRetention * 100).rounded()))%")
+                            .bold()
+                            .monospacedDigit()
+                    }
+                    .accessibilityHidden(true)
+                    Slider(
+                        value: Binding(
+                            get: { store.desiredRetention },
+                            set: { store.setDesiredRetention($0) }
+                        ),
+                        in: VerseStore.minRetention...VerseStore.maxRetention,
+                        step: 0.01
+                    ) { Text("Want to remember") }
+                    .accessibilityValue("\(Int((store.desiredRetention * 100).rounded())) percent")
+                    .accessibilityIdentifier("retention-slider")
+                    HStack(spacing: 8) {
+                        retentionPreset(title: "Relaxed 85%", value: 0.85)
+                        retentionPreset(title: "Standard 90%", value: 0.90)
+                        retentionPreset(title: "Locked-in 93%", value: 0.93)
+                    }
+                } header: {
+                    Text("Memory")
+                } footer: {
+                    Text("Higher retention = remember more, many more reviews — 95% vs 90% roughly doubles workload. Applies to future reviews only.")
+                }
+                Section {
                     Toggle("Show scheduler details", isOn: $store.showSchedulerDetails)
                 } header: {
                     Text("Display")
                 } footer: {
-                    Text("Off shows stage + interval (Learning · every 3d). On shows SM-2 internals (E1.65 · ×4).")
+                    Text("Off shows stage + interval (Learning · every 3d). On shows stability, difficulty and reps (S7.5d · D6.2 · ×4).")
                 }
                 Section("Export / Import (your data is yours)") {
                     Button("Prepare JSON export") {
@@ -385,7 +436,7 @@ struct SettingsView: View {
                     Button("Import pasted JSON…") { pastedJSON = ""; isPasting = true }
                 }
                 Section("About") {
-                    Text("Verse Loop Daily · ESV-only memorization with real SM-2 spaced repetition, forgiving first-letter testing, and exportable sync.").font(.caption)
+                    Text("Verse Loop Daily · ESV-only memorization with an FSRS-inspired scheduler, forgiving first-letter testing, 8s Undo, and exportable sync.").font(.caption)
                     Text(ESVService.attribution).font(.caption).foregroundStyle(.secondary)
                     Text("Verses: \(store.verses.count) · Due: \(store.dueCount)").font(.caption).foregroundStyle(.secondary)
                 }

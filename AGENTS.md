@@ -1,13 +1,13 @@
 # AGENTS.md — instructions for coding agents
 
-This repo is **Verse Loop Daily**: a native iOS app (SwiftUI, zero dependencies) + a Cloudflare Worker backend. Read this file before changing code. `README.md` is the human description; this file is the operating manual.
+This repo is **Verse Loop Daily**: a native iOS app (SwiftUI plus the swift-fsrs scheduler, no other dependencies) + a Cloudflare Worker backend. Read this file before changing code. `README.md` is the human description; this file is the operating manual.
 
 ## Repo map
 
 ```
 VerseLoop/              native iOS app (iOS 17+, iPhone SE 3 supported)
   VerseLoopApp.swift    entry
-  Models.swift          Verse, Grade, SM-2 ReviewState, LibraryEnvelope v1
+  Models.swift          Verse, Grade, FSRS ReviewState (swift-fsrs), envelope v4
   VerseStore.swift      queue, grading + undo, JSON persistence, export/import, sync
   ESVService.swift      Worker-proxy-first ESV fetch, direct fallback
   ContentView.swift     Loop / Verses / Add / Settings tabs
@@ -52,9 +52,9 @@ Path filters are load-bearing: app-only changes must not trigger worker deploys 
 
 ## Guardrails
 
-1. **Zero dependencies, SwiftUI only.** Do not add packages, web views, media, or analytics SDKs. Offline-first; reviews are pure local computation.
+1. **One dependency: swift-fsrs.** The app is SwiftUI-only plus the `swift-fsrs` SPM package (FSRS-6 scheduler). No other packages, web views, media, or analytics SDKs. Offline-first; reviews are pure local computation.
 2. **ESV text is never committed.** ESV © Crossway — no ESV passages in code, seeds, tests, or fixtures. The app ships with two short public-domain KJV demo verses so the simulator works offline; real ESV text is fetched at runtime through the Worker. Test fixtures must use KJV/short invented strings only.
 3. **No secrets in git.** `ESV_API_TOKEN` lives as a repo secret + Wrangler secret, never in `wrangler.toml` or code. No API key on-device.
 4. **Sync is opaque.** Libraries are AES-GCM encrypted client-side (key from sync code via HKDF-SHA256); the Worker only stores ciphertext, capped at 256 KB. Endpoints: `GET /health`, `GET /v1/esv?q=`, `PUT/GET /v1/sync/:code`. KV binding `SYNC_KV` is optional (free tier); code must keep working without it.
-5. **Tester behavior is the product.** Reference stays hidden, no word counts. Input is first letters flowing as one session, reference composed inline last (book initial, then numbers; colon/dash separators appear on their own). Wrong letter → haptic + red mistake, move on; every mistake has an "accidental?" forgive toggle; grades (Again/Hard/Good/Easy) drive real SM-2 (ease floor 1.3) with an 8-second Undo. Do not add progress bars, scoring games, or multi-translation UI without explicit instruction.
+5. **Tester behavior is the product.** Reference stays hidden, no word counts. Input is first letters flowing as one session, reference composed inline last (book initial, then numbers; colon/dash separators appear on their own). Wrong letter → haptic + red mistake, move on; every mistake has an "accidental?" forgive toggle; grades (Again/Hard/Good/Easy) drive FSRS-6 defaults via swift-fsrs (365d max-interval cap, intraday learning steps, 80–97% desired retention) with an 8-second Undo. Do not add progress bars, scoring games, or multi-translation UI without explicit instruction.
 6. **Target the SE3.** iOS 17.0 deployment target, iPhone SE (3rd gen) supported. Verify layouts in dark mode; evidence in `recordings/` is SE3-sim dark-mode captures.
