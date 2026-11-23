@@ -120,6 +120,7 @@
 			);
 			name = VerseLoop;
 			packageProductDependencies = (
+				EEE200000000000000002 /* FSRS */,
 			);
 			productName = VerseLoop;
 			productReference = BBB222222222222222222222 /* VerseLoop.app */;
@@ -164,6 +165,9 @@
 				en,
 			);
 			mainGroup = AAA111111111111111111112;
+			packageReferences = (
+				EEE200000000000000001 /* XCRemoteSwiftPackageReference "swift-fsrs" */,
+			);
 			productRefGroup = AAA111111111111111111114 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -217,6 +221,14 @@
 			targetProxy = CCC333333333333333333342 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		EEE200000000000000001 /* XCRemoteSwiftPackageReference "swift-fsrs" */ = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/open-spaced-repetition/swift-fsrs"; requirement = {kind = upToNextMajorVersion; minimumVersion = 6.0.0; }; };
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		EEE200000000000000002 /* FSRS */ = {isa = XCSwiftPackageProductDependency; package = EEE200000000000000001 /* XCRemoteSwiftPackageReference "swift-fsrs" */; productName = FSRS; };
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		HHH100000000000000000001 /* Debug */ = {

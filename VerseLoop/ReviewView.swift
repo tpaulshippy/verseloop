@@ -45,7 +45,7 @@ struct FlowLayout: Layout {
 /// - right character -> appears; wrong -> buzz, red mistake, move on
 /// - every mistake carries its own "accidental?" forgiveness toggle
 /// - mistake count shown instead of a progress bar
-/// - grade is ALWAYS explicit (Again/Hard/Good/Easy) -> true SM-2
+/// - grade is ALWAYS explicit (Again/Hard/Good/Easy) -> FSRS scheduling
 /// - every grade has an 8s Undo
 struct ReviewView: View {
     @EnvironmentObject var store: VerseStore
@@ -329,7 +329,15 @@ struct ReviewView: View {
     // MARK: grading (reference revealed only now that the test is over)
 
     private var gradeBlock: some View {
-        VStack(spacing: 10) {
+        // Single `now` for both the hypothetical dues and their formatting,
+        // so an intraday preview never slips a minute (no 599s floor slip).
+        // One shared helper drives both sides: these previews call
+        // previewDueDates(retention:) and grading calls advanced() with the
+        // same store.desiredRetention — same math, never duplicated.
+        let now = Date()
+        let dues = Dictionary(uniqueKeysWithValues:
+            store.review(for: verse.id).previewDueDates(retention: store.desiredRetention, now: now).map { ($0.grade, $0.due) })
+        return VStack(spacing: 10) {
             HStack {
                 Image(systemName: mistakeCount == 0 ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                     .foregroundStyle(mistakeCount == 0 ? .green : .orange)
@@ -343,17 +351,78 @@ struct ReviewView: View {
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                 ForEach(Grade.allCases, id: \.self) { g in
+                    let due = dues[g] ?? now
                     Button {
                         grade(g)
                     } label: {
-                        Label(g.title, systemImage: g.systemImage)
-                            .frame(maxWidth: .infinity, minHeight: 46)
+                        VStack(spacing: 2) {
+                            Label(g.title, systemImage: g.systemImage)
+                            Text(previewLabel(for: due, now: now))
+                                .font(.caption2)
+                                .opacity(0.85)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 54)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(tint(for: g))
+                    // Explicit label keeps the UI-test hook (buttons["Good"])
+                    // stable now that the button carries a preview subtitle.
+                    .accessibilityLabel(g.title)
+                    .accessibilityHint(previewHint(for: due, now: now))
                 }
             }
         }
+    }
+
+    /// One derivation for both the visible preview subtitle and the
+    /// VoiceOver hint: under 60 min -> minutes, under 24h -> hours (floored,
+    /// minimum "1h"), else the calendar-midnight day span. The minute bucket
+    /// rounds to nearest to agree with the shared `relativeDueText`.
+    private enum PreviewSpan {
+        case minutes(Int)
+        case hours(Int)
+        case days(Int)
+    }
+
+    private func previewSpan(for due: Date, now: Date) -> PreviewSpan {
+        let delta = max(0, due.timeIntervalSince(now))
+        if delta < 3_600 {
+            return .minutes(max(1, Int((delta / 60).rounded())))
+        }
+        if delta < 86_400 {
+            return .hours(max(1, Int(delta / 3_600)))
+        }
+        return .days(max(1, dayCount(from: now, to: due)))
+    }
+
+    /// Grade-button preview subtitle from the actual due delta ("10m",
+    /// "3h", "4d"). Buckets come from `previewSpan`, shared with the hint.
+    private func previewLabel(for due: Date, now: Date) -> String {
+        switch previewSpan(for: due, now: now) {
+        case .minutes(let m): return "\(m)m"
+        case .hours(let h): return "\(h)h"
+        case .days(let d): return "\(d)d"
+        }
+    }
+
+    /// VoiceOver words for the preview subtitle, with correct singulars
+    /// ("Reviews in 1 minute/hour/day"). Buckets come from `previewSpan`,
+    /// shared with the label, so the two can never disagree.
+    private func previewHint(for due: Date, now: Date) -> String {
+        switch previewSpan(for: due, now: now) {
+        case .minutes(let m): return "Reviews in \(m) minute\(m == 1 ? "" : "s")"
+        case .hours(let h): return "Reviews in \(h) hour\(h == 1 ? "" : "s")"
+        case .days(let d): return "Reviews in \(d) day\(d == 1 ? "" : "s")"
+        }
+    }
+
+    /// Calendar-day span between the two midnights, so a +4-day due reads
+    /// "4d" no matter what time of day the preview renders.
+    private func dayCount(from now: Date, to due: Date) -> Int {
+        let cal = Calendar.current
+        return cal.dateComponents([.day],
+                                  from: cal.startOfDay(for: now),
+                                  to: cal.startOfDay(for: due)).day ?? Int(due.timeIntervalSince(now) / 86_400)
     }
 
     private var gradedBlock: some View {
@@ -449,7 +518,11 @@ struct ReviewView: View {
 
     private var nextDueText: String {
         let r = store.review(for: verse.id)
-        if r.intervalDays <= 0 { return "~10 min" }
+        if r.intervalDays <= 0 {
+            // Intraday retry: one shared formatter with the Loop row, so the
+            // banner and the row always agree ("due now" once it has passed).
+            return ReviewState.relativeDueText(due: r.due, now: Date())
+        }
         return r.due.formatted(date: .abbreviated, time: .omitted)
     }
 

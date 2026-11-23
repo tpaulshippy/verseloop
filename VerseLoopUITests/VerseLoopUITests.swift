@@ -65,6 +65,16 @@ final class VerseLoopUITests: XCTestCase {
         field.typeText("P231")
         XCTAssertTrue(app.staticTexts["Suggested: Easy — but your grade decides, as always."].waitForExistence(timeout: 10))
 
+        // Grade previews are minute-precise dues from the real FSRS schedule.
+        // Again is always intraday on this card: "1m" from learning steps on
+        // a young card, "10m" relearning once it graduates — either way an
+        // exact minute value, never the old "~10m" approximation.
+        let againButton = app.buttons["Again"]
+        XCTAssertTrue(againButton.waitForExistence(timeout: 5))
+        let againLabels = againButton.staticTexts.allElementsBoundByIndex.map(\.label)
+        XCTAssertTrue(againLabels.contains("1m") || againLabels.contains("10m"), "Again preview labels: \(againLabels)")
+        snap(app, "04-grade-previews")
+
         // Grade, undo the grade, re-grade, advance
         app.buttons["Good"].tap()
         XCTAssertTrue(app.buttons["Undo grade (8s)"].waitForExistence(timeout: 5))
@@ -82,6 +92,11 @@ final class VerseLoopUITests: XCTestCase {
         app.tabBars.buttons["Settings"].tap()
         XCTAssertTrue(app.staticTexts["Settings"].waitForExistence(timeout: 10))
         snap(app, "05-settings")
+        // Memory section: desired-retention slider + presets.
+        let retentionSlider = app.sliders["retention-slider"]
+        for _ in 0..<6 where !retentionSlider.exists { app.swipeUp() }
+        XCTAssertTrue(retentionSlider.waitForExistence(timeout: 5))
+        snap(app, "05b-settings-memory")
         app.tabBars.buttons["Verses"].tap()
         app.buttons["Add"].tap()
         XCTAssertTrue(app.staticTexts["Add verse"].waitForExistence(timeout: 10))
